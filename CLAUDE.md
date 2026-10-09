@@ -1,0 +1,29 @@
+# Open Sampler IG — notes de reprise
+
+App Flutter (Dart 3) Android, fork d'Open Sampler (EUPL 1.2). Utilisateur : Ivan (français).
+Méthode : plans phase par phase. Interface encore en anglais (traduction FR prévue en phase 2).
+
+## Phases
+- Phase 1 (v2.0.0, livrée) : portage Flutter 3, copie des sons dans l'app, fix nom de pad,
+  progression/temps restant, état visible, groupes d'exclusion, fondu, écran allumé, mode scène.
+- Phase 2 (à faire) : export/import projet avec sons, déplacer/échanger/dupliquer un pad,
+  volume général, (palette déjà faite), app en français.
+- Plus tard : plusieurs pages de pads, point de départ/fin d'un son.
+
+## Compiler dans une session cloud
+- Installer Flutter stable (storage.googleapis.com) + Android cmdline-tools (dl.google.com),
+  `sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"`.
+- Maven Central renvoie souvent 429 via le proxy : ajouter un init script Gradle
+  (~/.gradle/init.d) qui place `https://maven-central.storage-download.googleapis.com/maven2/`
+  en premier dépôt (pluginManagement + projets racine uniquement).
+- `flutter build apk --release --split-per-abi` (l'APK universel ~50 Mo dépasse la limite d'envoi de 30 Mo).
+- Signature : `android/key.properties` + keystore `opensampler-ig-release.jks` (alias `opensampler`),
+  JAMAIS versionnés. Ivan les détient ; les lui demander avant toute release, sinon
+  l'APK ne s'installera pas par-dessus la version existante.
+- Incrémenter `version:` dans pubspec.yaml (versionCode) à chaque release.
+
+## Points techniques
+- Contexte audio global avec `AndroidAudioFocus.none`, sinon les pads se coupent entre eux.
+- Pads « courts » = PlayerMode.lowLatency (SoundPool) : aucune position ni fin de lecture,
+  d'où l'horloge interne dans `PadVoice` et la durée sondée/mise en cache (`durationMs`).
+- Compatibilité : les JSON de projet 2021 doivent rester lisibles (test/settings_test.dart).

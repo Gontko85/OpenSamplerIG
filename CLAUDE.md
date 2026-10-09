@@ -1,7 +1,7 @@
 # Open Sampler IG — notes de reprise
 
 App Flutter (Dart 3) Android, fork d'Open Sampler (EUPL 1.2). Utilisateur : Ivan (français).
-Méthode : plans phase par phase. Interface encore en anglais (traduction FR prévue en phase 2).
+Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 
 ## Phases
 - Phase 1 (v2.0.0, livrée) : portage Flutter 3, copie des sons dans l'app, fix nom de pad,
@@ -9,7 +9,8 @@ Méthode : plans phase par phase. Interface encore en anglais (traduction FR pr�
 - Phase 2 (v2.1.0, livrée) : gros bouton STOP, « Retirer » efface aussi le nom, export/import
   projet (.zip), échanger/déplacer/dupliquer un pad, interface FR/EN, nouvelle icône
   (source : assets/icon/logo_circle.png). Volume général écarté par Ivan.
-- Plus tard : plusieurs pages de pads, point de départ/fin d'un son.
+- v2.2.0 (livrée) : pages/onglets par projet, STOP réduit (25 % de largeur, à droite).
+- Plus tard : point de départ/fin d'un son.
 
 ## Compiler dans une session cloud
 - Installer Flutter stable (storage.googleapis.com) + Android cmdline-tools (dl.google.com),
@@ -24,6 +25,10 @@ Méthode : plans phase par phase. Interface encore en anglais (traduction FR pr�
 - Incrémenter `version:` dans pubspec.yaml (versionCode) à chaque release.
 
 ## Points techniques
+- Pages : `Settings.padSettings` est une liste plate (page après page, x*y pads chacune),
+  `pageNames` donne les pages. Les index de pads sont globaux ; `SampleEngine.applyLayout`
+  déplace les lecteurs avec leurs pads (ajout/suppression/déplacement de page sans couper le son).
+  JSON : clé `pages` + `padSettings` de la page 1 (lisible par les anciennes versions).
 - Textes : tout passe par `S` (lib/l10n.dart) — ne pas écrire de texte en dur dans les écrans.
 - Versions split-per-abi : versionCode = 1000 × ABI + build (arm64 = 2xxx).
 - Contexte audio global avec `AndroidAudioFocus.none`, sinon les pads se coupent entre eux.

@@ -48,9 +48,7 @@ class PadTile extends StatelessWidget {
     final bool dark = settings.color.computeLuminance() < 0.45;
 
     // Progress fill: lighter on dark pads, darker on light pads.
-    final Color fill = dark
-        ? Colors.white.withValues(alpha: 0.30)
-        : Colors.black.withValues(alpha: 0.22);
+    final Color fill = dark ? Colors.white.withValues(alpha: 0.30) : Colors.black.withValues(alpha: 0.22);
 
     Color? outline;
     switch (state) {
@@ -131,14 +129,15 @@ class PadTile extends StatelessWidget {
         Positioned(
           right: 4,
           top: 3,
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (settings.looped && settings.hasSample)
-              Icon(Icons.repeat, size: 14, color: settings.textColor.withValues(alpha: 0.7)),
-            if (state == VoiceState.paused)
-              Icon(Icons.pause, size: 16, color: settings.textColor),
-            if (v?.missing ?? false)
-              const Icon(Icons.error, size: 16, color: Colors.redAccent),
-          ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (settings.looped && settings.hasSample)
+                Icon(Icons.repeat, size: 14, color: settings.textColor.withValues(alpha: 0.7)),
+              if (state == VoiceState.paused) Icon(Icons.pause, size: 16, color: settings.textColor),
+              if (v?.missing ?? false) const Icon(Icons.error, size: 16, color: Colors.redAccent),
+            ],
+          ),
         ),
         // Remaining time.
         if (showRemaining && active && v?.remaining != null)
@@ -172,11 +171,7 @@ class PadTile extends StatelessWidget {
     if (stageLock) {
       // Stage mode: trigger on finger down (no tap-up delay), several pads at once,
       // and no long press, so nothing can be reconfigured by accident.
-      return Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: (_) => onTrigger(),
-        child: body,
-      );
+      return Listener(behavior: HitTestBehavior.opaque, onPointerDown: (_) => onTrigger(), child: body);
     }
 
     return Material(

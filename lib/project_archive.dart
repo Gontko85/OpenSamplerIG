@@ -94,8 +94,7 @@ class ProjectArchive {
     final projectFile = archive.findFile(projectEntry);
     if (projectFile == null) throw const FormatException('no project');
 
-    final Map<String, dynamic> map =
-        jsonDecode(utf8.decode(projectFile.content)) as Map<String, dynamic>;
+    final Map<String, dynamic> map = jsonDecode(utf8.decode(projectFile.content)) as Map<String, dynamic>;
 
     // Sounds first.
     final Map<String, String> storedFor = {};

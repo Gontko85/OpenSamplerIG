@@ -39,16 +39,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Settings get _s => widget.settings;
 
   Widget _dropdownRow<T>(String label, T value, Map<T, String> items, ValueChanged<T> onChanged) {
-    return Row(children: <Widget>[
-      Expanded(child: Text(label)),
-      DropdownButton<T>(
-        value: items.containsKey(value) ? value : items.keys.first,
-        onChanged: (v) {
-          if (v != null) setState(() => onChanged(v));
-        },
-        items: items.entries.map((e) => DropdownMenuItem<T>(value: e.key, child: Text(e.value))).toList(),
-      ),
-    ]);
+    return Row(
+      children: <Widget>[
+        Expanded(child: Text(label)),
+        DropdownButton<T>(
+          value: items.containsKey(value) ? value : items.keys.first,
+          onChanged: (v) {
+            if (v != null) setState(() => onChanged(v));
+          },
+          items: items.entries.map((e) => DropdownMenuItem<T>(value: e.key, child: Text(e.value))).toList(),
+        ),
+      ],
+    );
   }
 
   @override
@@ -63,18 +65,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: <Widget>[
           Text(S.projectSettings, style: header),
           const SizedBox(height: 8),
-          _dropdownRow<int>(S.horizontalPads, _s.x, gridItems, (v) => _s.x = v),
-          _dropdownRow<int>(S.verticalPads, _s.y, gridItems, (v) => _s.y = v),
+          _dropdownRow<int>(S.horizontalPads, _s.x, gridItems, (v) {
+            _s.x = v;
+            _s.validate();
+          }),
+          _dropdownRow<int>(S.verticalPads, _s.y, gridItems, (v) {
+            _s.y = v;
+            _s.validate();
+          }),
+          if (_s.pageCount > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(S.gridAllPages, style: Theme.of(context).textTheme.bodySmall),
+            ),
           const SizedBox(height: 28),
           Text(S.globalSettings, style: header),
           const SizedBox(height: 8),
-          _dropdownRow<String>(S.language, S.code, const {'fr': 'Français', 'en': 'English'},
-              (v) => setLanguage(v)),
-          _dropdownRow<String>(S.fontSize, GlobalPrefs.fontSize,
-              {for (final f in _fontSizes) f: f == 'Default' ? S.fontDefault : f},
-              (v) => GlobalPrefs.fontSize = v),
-          _dropdownRow<int>(S.fadeOut, GlobalPrefs.fadeMs, _fades,
-              (v) => GlobalPrefs.fadeMs = v),
+          _dropdownRow<String>(S.language, S.code, const {
+            'fr': 'Français',
+            'en': 'English',
+          }, (v) => setLanguage(v)),
+          _dropdownRow<String>(S.fontSize, GlobalPrefs.fontSize, {
+            for (final f in _fontSizes) f: f == 'Default' ? S.fontDefault : f,
+          }, (v) => GlobalPrefs.fontSize = v),
+          _dropdownRow<int>(S.fadeOut, GlobalPrefs.fadeMs, _fades, (v) => GlobalPrefs.fadeMs = v),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(S.showRemaining),

@@ -34,6 +34,9 @@ Settings _demo() {
   }
   s.padSettings[0].group = 1;
   s.padSettings[1].group = 1;
+  s.pageNames[0] = 'Match';
+  s.addPage('Mi-temps');
+  s.addPage('Animations');
   return s;
 }
 

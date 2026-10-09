@@ -110,16 +110,17 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
 
   void _press(int idx) => _engine.press(idx);
 
+  int get _page => _settings.currentPage.clamp(0, _settings.pageCount - 1);
+
   Future<void> _editPad(int padIdx) async {
-    final int row = padIdx ~/ _settings.x;
-    final int col = padIdx % _settings.x;
+    final int inPage = _settings.indexInPage(padIdx);
+    final int row = inPage ~/ _settings.x;
+    final int col = inPage % _settings.x;
     final before = PadSettings.copy(_settings.padSettings[padIdx]);
 
     final int? otherPad = await Navigator.push<int>(
       context,
-      MaterialPageRoute(
-        builder: (context) => PadSettingsScreen(col, row, padIdx, _settings),
-      ),
+      MaterialPageRoute(builder: (context) => PadSettingsScreen(col, row, padIdx, _settings)),
     );
 
     // The pad was swapped with / copied to another pad: reload both.
@@ -138,7 +139,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     await _settings.save();
 
     // Reload only this pad if its sound changed: the others keep playing.
-    final bool audioChanged = after.sample != before.sample ||
+    final bool audioChanged =
+        after.sample != before.sample ||
         after.looped != before.looped ||
         after.long != before.long ||
         after.volume != before.volume;
@@ -150,6 +152,147 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   }
 
   //----------------------------------------------------------------------------
+  // Pages
+
+  void _selectPage(int p) {
+    if (p == _page) return;
+    setState(() => _settings.currentPage = p);
+    _settings.save();
+  }
+
+  /// Runs a page operation on the model, then moves the audio players along
+  /// with their pads so that whatever is playing keeps playing.
+  Future<void> _changePages(void Function() op) async {
+    final before = List<PadSettings>.of(_settings.padSettings);
+    op();
+    final List<int> oldIndexForNew = _settings.padSettings
+        .map((pad) => before.indexWhere((b) => identical(b, pad)))
+        .toList();
+    await _engine.applyLayout(oldIndexForNew, _settings);
+    await _settings.save();
+    _saveIfDirty();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _addPage() async {
+    await _changePages(() => _settings.currentPage = _settings.addPage());
+  }
+
+  Future<void> _pageMenu(int p) async {
+    if (_stageLock) return;
+    final String label = _settings.pageLabel(p, S.pageN);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(label, style: Theme.of(ctx).textTheme.titleMedium),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: Text(S.renamePage),
+              onTap: () => Navigator.pop(ctx, 'rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: Text(S.duplicatePage),
+              onTap: () => Navigator.pop(ctx, 'dup'),
+            ),
+            if (p > 0)
+              ListTile(
+                leading: const Icon(Icons.arrow_back),
+                title: Text(S.movePageLeft),
+                onTap: () => Navigator.pop(ctx, 'left'),
+              ),
+            if (p < _settings.pageCount - 1)
+              ListTile(
+                leading: const Icon(Icons.arrow_forward),
+                title: Text(S.movePageRight),
+                onTap: () => Navigator.pop(ctx, 'right'),
+              ),
+            if (_settings.pageCount > 1)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: Text(S.deletePage, style: const TextStyle(color: Colors.redAccent)),
+                onTap: () => Navigator.pop(ctx, 'delete'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case 'rename':
+        final name = await askText(context, S.pageNamePrompt, initial: _settings.pageNames[p]);
+        if (name == null) return;
+        setState(() => _settings.pageNames[p] = name.trim());
+        await _settings.save();
+        break;
+      case 'dup':
+        await _changePages(() => _settings.currentPage = _settings.duplicatePage(p, S.copyOf(label)));
+        break;
+      case 'left':
+      case 'right':
+        final int d = action == 'left' ? -1 : 1;
+        await _changePages(() {
+          _settings.movePage(p, d);
+          if (_settings.currentPage == p) {
+            _settings.currentPage = p + d;
+          } else if (_settings.currentPage == p + d) {
+            _settings.currentPage = p;
+          }
+        });
+        break;
+      case 'delete':
+        final ok = await confirm(context, content: Text(S.deletePageConfirm(label)));
+        if (!ok) return;
+        await _changePages(() {
+          _settings.removePage(p);
+          if (_settings.currentPage > p) _settings.currentPage--;
+          _settings.currentPage = _settings.currentPage.clamp(0, _settings.pageCount - 1);
+        });
+        break;
+    }
+  }
+
+  Widget _buildPageTabs() {
+    final n = _settings.padsPerPage;
+    return Container(
+      height: 46,
+      color: const Color(0xFF2B2B2B),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        children: [
+          for (int p = 0; p < _settings.pageCount; p++)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _PageTab(
+                label: _settings.pageLabel(p, S.pageN),
+                selected: p == _page,
+                playing: _engine.anyActiveIn(p * n, (p + 1) * n),
+                onTap: () => _selectPage(p),
+                onLongPress: _stageLock ? null : () => _pageMenu(p),
+              ),
+            ),
+          if (!_stageLock)
+            IconButton(
+              tooltip: S.addPage,
+              onPressed: _addPage,
+              icon: const Icon(Icons.add, color: Colors.white70),
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
+  }
+
+  //----------------------------------------------------------------------------
 
   void _toggleStageLock() {
     setState(() {
@@ -158,17 +301,15 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        duration: const Duration(seconds: 2),
-        content: Text(_stageLock ? S.stageOn : S.stageOff),
-      ));
+      ..showSnackBar(
+        SnackBar(duration: const Duration(seconds: 2), content: Text(_stageLock ? S.stageOn : S.stageOff)),
+      );
   }
 
   //----------------------------------------------------------------------------
 
   Future<void> _goToNew() async {
-    final ok = await confirm(context,
-        content: Text(S.newProjectConfirm));
+    final ok = await confirm(context, content: Text(S.newProjectConfirm));
     if (!ok) return;
 
     _settings = defaultSettings();
@@ -215,8 +356,10 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     files.sort((a, b) => p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase()));
 
     if (!mounted) return;
-    final File? settingsFile =
-        await Navigator.push(context, MaterialPageRoute(builder: (context) => LoadScreen(files)));
+    final File? settingsFile = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => LoadScreen(files)),
+    );
 
     if (settingsFile != null) {
       try {
@@ -225,8 +368,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
         await _reloadAll();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(S.cannotOpen(e))));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(S.cannotOpen(e))));
         }
       }
     }
@@ -247,11 +389,13 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       builder: (_) => PopScope(
         canPop: false,
         child: AlertDialog(
-          content: Row(children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 20),
-            Expanded(child: Text(label)),
-          ]),
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
+              Expanded(child: Text(label)),
+            ],
+          ),
         ),
       ),
     );
@@ -342,19 +486,15 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       backgroundColor: const Color.fromARGB(255, 60, 60, 60),
       appBar: AppBar(
         titleSpacing: 12,
-        title: Row(children: [
-          Flexible(
-            child: Text(_settings.name, overflow: TextOverflow.ellipsis, maxLines: 1),
-          ),
-          const SizedBox(width: 10),
+        title: Text(_settings.name, overflow: TextOverflow.ellipsis, maxLines: 1),
+        actions: [
           _StopButton(
-            width: MediaQuery.sizeOf(context).width * 0.5,
+            width: MediaQuery.sizeOf(context).width * 0.25,
             active: _engine.anyActive,
             fading: _engine.anyFading,
             onPressed: () => _engine.stopAll(),
           ),
-        ]),
-        actions: [
+          const SizedBox(width: 4),
           IconButton(
             tooltip: _stageLock ? S.stageOnTooltip : S.stageOffTooltip,
             icon: Icon(_stageLock ? Icons.lock : Icons.lock_open),
@@ -380,32 +520,100 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(spacing),
-          child: Column(
-            children: List.generate(_settings.y, (row) {
-              return Expanded(
-                child: Row(
-                  children: List.generate(_settings.x, (col) {
-                    final int i = row * _settings.x + col;
+        child: Column(
+          children: [
+            // Page tabs (hidden in stage mode when the project has a single page).
+            if (_settings.pageCount > 1 || !_stageLock) _buildPageTabs(),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(spacing),
+                child: Column(
+                  children: List.generate(_settings.y, (row) {
                     return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(spacing / 2),
-                        child: PadTile(
-                          settings: _settings.padSettings[i],
-                          voice: _engine.voice(i),
-                          fontSize: fontSize,
-                          showRemaining: showRemaining,
-                          stageLock: _stageLock,
-                          onTrigger: () => _press(i),
-                          onEdit: () => _editPad(i),
-                        ),
+                      child: Row(
+                        children: List.generate(_settings.x, (col) {
+                          final int i = _settings.globalIndex(_page, row * _settings.x + col);
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(spacing / 2),
+                              child: PadTile(
+                                settings: _settings.padSettings[i],
+                                voice: _engine.voice(i),
+                                fontSize: fontSize,
+                                showRemaining: showRemaining,
+                                stageLock: _stageLock,
+                                onTrigger: () => _press(i),
+                                onEdit: () => _editPad(i),
+                              ),
+                            ),
+                          );
+                        }),
                       ),
                     );
                   }),
                 ),
-              );
-            }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+//==============================================================================
+
+/// One page tab. A dot shows that a sound of this page is playing.
+class _PageTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool playing;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _PageTab({
+    required this.label,
+    required this.selected,
+    required this.playing,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fg = selected ? Colors.black : Colors.white;
+    return Material(
+      color: selected ? const Color(0xFFFB8C00) : const Color(0xFF4A4A4A),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (playing) ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.black : const Color(0xFF69F0AE),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 15,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -448,8 +656,8 @@ class _StopButton extends StatelessWidget {
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1.5),
+            textStyle: Theme.of(context).textTheme.labelLarge
+                ?.copyWith(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1.5),
           ),
           onPressed: onPressed,
           icon: Icon(fading ? Icons.flash_on : Icons.stop_rounded, size: 28),

@@ -130,6 +130,7 @@ class PadVoice {
 class SampleEngine extends ChangeNotifier {
   List<PadVoice?> _voices = [];
   int _generation = 0;
+  int _nextPlayerId = 0;
 
   /// Fade-out duration used when a pad is stopped (0 = cut immediately).
   int fadeMs = 1000;
@@ -177,6 +178,42 @@ class SampleEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Applies a new pad layout without interrupting the pads that survive it.
+  /// [oldIndexForNew][i] is the previous index of new pad i, or -1 for a new pad.
+  /// Voices whose pad disappeared are stopped and released.
+  Future<void> applyLayout(List<int> oldIndexForNew, Settings settings) async {
+    _generation++; // cancels a running init()
+    final old = _voices;
+    final List<PadVoice?> next = List<PadVoice?>.filled(oldIndexForNew.length, null);
+    final Set<int> kept = {};
+    for (int i = 0; i < oldIndexForNew.length; i++) {
+      final int o = oldIndexForNew[i];
+      if (o >= 0 && o < old.length && identical(old[o]?.settings, settings.padSettings[i])) {
+        next[i] = old[o];
+        kept.add(o);
+      }
+    }
+    _voices = next;
+    for (int o = 0; o < old.length; o++) {
+      if (!kept.contains(o)) await old[o]?.dispose();
+    }
+    for (int i = 0; i < next.length; i++) {
+      if (next[i] == null && settings.padSettings[i].hasSample) {
+        _voices[i] = await _createVoice(i, settings.padSettings[i]);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// True when at least one pad between [from] and [to] (excluded) is playing or paused.
+  bool anyActiveIn(int from, int to) {
+    for (int i = from; i < to && i < _voices.length; i++) {
+      final v = _voices[i];
+      if (v != null && v.state != VoiceState.idle) return true;
+    }
+    return false;
+  }
+
   Future<PadVoice?> _createVoice(int i, PadSettings pad) async {
     if (!pad.hasSample) return null;
 
@@ -188,7 +225,8 @@ class SampleEngine extends ChangeNotifier {
     }
 
     try {
-      final player = AudioPlayer(playerId: 'pad_$i');
+      // Unique id: pads can move between indexes (page moves), ids must never collide.
+      final player = AudioPlayer(playerId: 'pad_${_nextPlayerId++}');
       v.player = player;
       await player.setPlayerMode(pad.long ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
       await player.setReleaseMode(pad.looped ? ReleaseMode.loop : ReleaseMode.stop);
@@ -214,13 +252,15 @@ class SampleEngine extends ChangeNotifier {
 
       if (pad.long) {
         v._subs.add(player.onPlayerComplete.listen((_) => _onComplete(v)));
-        v._subs.add(player.onPositionChanged.listen((pos) {
-          if (v.state == VoiceState.playing || v.state == VoiceState.fading) {
-            if (DateTime.now().isAfter(v._ignorePositionUntil)) {
-              v._clockRestart(pos);
+        v._subs.add(
+          player.onPositionChanged.listen((pos) {
+            if (v.state == VoiceState.playing || v.state == VoiceState.fading) {
+              if (DateTime.now().isAfter(v._ignorePositionUntil)) {
+                v._clockRestart(pos);
+              }
             }
-          }
-        }));
+          }),
+        );
       }
     } catch (e) {
       debugPrint('Pad $i: cannot load ${pad.sample}: $e');

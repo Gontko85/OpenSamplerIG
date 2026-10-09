@@ -76,8 +76,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
       await widget.project.save();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(S.cannotImport(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(S.cannotImport(e))));
       }
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -90,7 +89,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     // Remove the sound AND its name: the pad goes back to a blank pad (shows its number).
     _pad.sample = "";
     _pad.durationMs = 0;
-    _pad.caption = "${widget.index + 1}";
+    _pad.caption = "${widget.project.indexInPage(widget.index) + 1}";
     await widget.project.save();
     setState(() {});
   }
@@ -131,7 +130,9 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
       // A blank pad keeps showing its own position number.
       for (final i in [widget.index, target]) {
         final pad = pads[i];
-        if (!pad.hasSample && int.tryParse(pad.caption) != null) pad.caption = '${i + 1}';
+        if (!pad.hasSample && int.tryParse(pad.caption) != null) {
+          pad.caption = '${widget.project.indexInPage(i) + 1}';
+        }
       }
     }
     await widget.project.save();
@@ -143,9 +144,18 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
   //----------------------------------------------------------------------------
 
   static const List<Color> _palette = [
-    Color(0xFF9E9E9E), Color(0xFF424242), Color(0xFFE53935), Color(0xFFFB8C00),
-    Color(0xFFFDD835), Color(0xFF43A047), Color(0xFF00897B), Color(0xFF039BE5),
-    Color(0xFF3949AB), Color(0xFF8E24AA), Color(0xFFD81B60), Color(0xFFFFFFFF),
+    Color(0xFF9E9E9E),
+    Color(0xFF424242),
+    Color(0xFFE53935),
+    Color(0xFFFB8C00),
+    Color(0xFFFDD835),
+    Color(0xFF43A047),
+    Color(0xFF00897B),
+    Color(0xFF039BE5),
+    Color(0xFF3949AB),
+    Color(0xFF8E24AA),
+    Color(0xFFD81B60),
+    Color(0xFFFFFFFF),
   ];
 
   @override
@@ -154,7 +164,17 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     final String sampleName = _pad.hasSample ? _stripCopySuffix(p.basename(_pad.sample)) : S.none;
 
     return Scaffold(
-      appBar: AppBar(title: Text(S.padTitle(widget.row + 1, widget.col + 1))),
+      appBar: AppBar(
+        title: Text(
+          widget.project.pageCount > 1
+              ? S.padTitleOnPage(
+                  widget.project.pageLabel(widget.project.pageOf(widget.index), S.pageN),
+                  widget.row + 1,
+                  widget.col + 1,
+                )
+              : S.padTitle(widget.row + 1, widget.col + 1),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: <Widget>[
@@ -168,86 +188,109 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
           const SizedBox(height: 12),
 
           Text(S.soundClip, style: label),
-          Row(children: <Widget>[
-            Expanded(child: Text(sampleName, overflow: TextOverflow.ellipsis)),
-            if (_importing)
-              const Padding(
-                padding: EdgeInsets.all(8),
-                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            else ...[
-              if (_pad.hasSample)
-                IconButton(tooltip: S.remove, icon: const Icon(Icons.delete_outline), onPressed: _onRemoveSample),
-              TextButton(onPressed: _onSelectSample, child: Text(S.select)),
+          Row(
+            children: <Widget>[
+              Expanded(child: Text(sampleName, overflow: TextOverflow.ellipsis)),
+              if (_importing)
+                const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else ...[
+                if (_pad.hasSample)
+                  IconButton(
+                    tooltip: S.remove,
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: _onRemoveSample,
+                  ),
+                TextButton(onPressed: _onSelectSample, child: Text(S.select)),
+              ],
             ],
-          ]),
+          ),
           const Divider(),
 
           Text(S.caption, style: label),
-          Row(children: <Widget>[
-            Expanded(child: Text(_pad.caption, overflow: TextOverflow.ellipsis)),
-            TextButton(onPressed: _onChangeCaption, child: Text(S.set)),
-          ]),
+          Row(
+            children: <Widget>[
+              Expanded(child: Text(_pad.caption, overflow: TextOverflow.ellipsis)),
+              TextButton(onPressed: _onChangeCaption, child: Text(S.set)),
+            ],
+          ),
           const Divider(),
 
           Text(S.arrange, style: label),
           const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            OutlinedButton.icon(
-              onPressed: () => _arrange(copy: false),
-              icon: const Icon(Icons.swap_horiz),
-              label: Text(S.swapWith),
-            ),
-            OutlinedButton.icon(
-              onPressed: _pad.hasSample ? () => _arrange(copy: true) : null,
-              icon: const Icon(Icons.copy),
-              label: Text(S.copyTo),
-            ),
-          ]),
-          const Divider(),
-
-          Row(children: <Widget>[
-            Text(S.looped, style: label),
-            const Spacer(),
-            Switch(value: _pad.looped, onChanged: (v) => setState(() => _pad.looped = v)),
-          ]),
-          const Divider(),
-
-          Row(children: <Widget>[
-            Expanded(child: Text(S.longSound, style: label)),
-            Switch(
-              value: _pad.long,
-              onChanged: (v) => setState(() {
-                _pad.long = v;
-                _pad.durationMs = 0;
-              }),
-            ),
-          ]),
-          const Divider(),
-
-          Row(children: <Widget>[
-            Expanded(child: Text(S.behaviour, style: label)),
-            DropdownButton<PressBehaviour>(
-              value: _pad.behaviour,
-              onChanged: (v) => setState(() => _pad.behaviour = v ?? PressBehaviour.restart),
-              items: PressBehaviour.values
-                  .map((b) => DropdownMenuItem(value: b, child: Text(S.behaviourName(pressBehaviourToString(b)))))
-                  .toList(),
-            ),
-          ]),
-          const Divider(),
-
-          Row(children: <Widget>[
-            Expanded(child: Text(S.group, style: label)),
-            DropdownButton<int>(
-              value: _pad.group,
-              onChanged: (v) => setState(() => _pad.group = v ?? 0),
-              items: List.generate(
-                groupNames.length,
-                (i) => DropdownMenuItem(value: i, child: Text(S.groupName(i))),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _arrange(copy: false),
+                icon: const Icon(Icons.swap_horiz),
+                label: Text(S.swapWith),
               ),
-            ),
-          ]),
+              OutlinedButton.icon(
+                onPressed: _pad.hasSample ? () => _arrange(copy: true) : null,
+                icon: const Icon(Icons.copy),
+                label: Text(S.copyTo),
+              ),
+            ],
+          ),
+          const Divider(),
+
+          Row(
+            children: <Widget>[
+              Text(S.looped, style: label),
+              const Spacer(),
+              Switch(value: _pad.looped, onChanged: (v) => setState(() => _pad.looped = v)),
+            ],
+          ),
+          const Divider(),
+
+          Row(
+            children: <Widget>[
+              Expanded(child: Text(S.longSound, style: label)),
+              Switch(
+                value: _pad.long,
+                onChanged: (v) => setState(() {
+                  _pad.long = v;
+                  _pad.durationMs = 0;
+                }),
+              ),
+            ],
+          ),
+          const Divider(),
+
+          Row(
+            children: <Widget>[
+              Expanded(child: Text(S.behaviour, style: label)),
+              DropdownButton<PressBehaviour>(
+                value: _pad.behaviour,
+                onChanged: (v) => setState(() => _pad.behaviour = v ?? PressBehaviour.restart),
+                items: PressBehaviour.values
+                    .map(
+                      (b) =>
+                          DropdownMenuItem(value: b, child: Text(S.behaviourName(pressBehaviourToString(b)))),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
+          const Divider(),
+
+          Row(
+            children: <Widget>[
+              Expanded(child: Text(S.group, style: label)),
+              DropdownButton<int>(
+                value: _pad.group,
+                onChanged: (v) => setState(() => _pad.group = v ?? 0),
+                items: List.generate(
+                  groupNames.length,
+                  (i) => DropdownMenuItem(value: i, child: Text(S.groupName(i))),
+                ),
+              ),
+            ],
+          ),
           const Divider(),
 
           Text(S.volume((_pad.volume * 100).round()), style: label),
@@ -307,18 +350,20 @@ class _PaletteRow extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: colors
-          .map((c) => InkWell(
-                onTap: () => onPick(c),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: c,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.black26),
-                  ),
+          .map(
+            (c) => InkWell(
+              onTap: () => onPick(c),
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: c,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black26),
                 ),
-              ))
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -328,8 +373,8 @@ class _PaletteRow extends StatelessWidget {
 
 //==============================================================================
 
-/// Shows the pad grid in miniature to pick a target pad.
-class _PadPickerDialog extends StatelessWidget {
+/// Shows the pad grid in miniature to pick a target pad (on any page).
+class _PadPickerDialog extends StatefulWidget {
   final Settings project;
   final int current;
   final String title;
@@ -337,59 +382,92 @@ class _PadPickerDialog extends StatelessWidget {
   const _PadPickerDialog({required this.project, required this.current, required this.title});
 
   @override
+  State<_PadPickerDialog> createState() => _PadPickerDialogState();
+}
+
+class _PadPickerDialogState extends State<_PadPickerDialog> {
+  late int _page = widget.project.pageOf(widget.current);
+
+  @override
   Widget build(BuildContext context) {
+    final project = widget.project;
     final int cols = project.x;
     final int rows = project.y;
     return AlertDialog(
-      title: Text(title, style: const TextStyle(fontSize: 17)),
+      title: Text(widget.title, style: const TextStyle(fontSize: 17)),
       contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
       content: SizedBox(
         width: 320,
-        child: AspectRatio(
-          aspectRatio: cols / rows * 1.4,
-          child: Column(
-            children: List.generate(rows, (r) => Expanded(
-                  child: Row(
-                    children: List.generate(cols, (c) {
-                      final int i = r * cols + c;
-                      final pad = project.padSettings[i];
-                      final bool isCurrent = i == current;
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Material(
-                            color: pad.hasSample ? pad.color : Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(4),
-                            child: InkWell(
-                              onTap: isCurrent ? null : () => Navigator.pop(context, i),
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding: const EdgeInsets.all(2),
-                                decoration: isCurrent
-                                    ? BoxDecoration(
-                                        border: Border.all(color: Colors.black, width: 2),
-                                        borderRadius: BorderRadius.circular(4))
-                                    : null,
-                                child: Text(
-                                  isCurrent ? '(${S.thisPad})' : pad.caption,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: pad.hasSample ? pad.textColor : Colors.black54,
-                                    fontStyle: isCurrent ? FontStyle.italic : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (project.pageCount > 1)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (int p = 0; p < project.pageCount; p++)
+                      ChoiceChip(
+                        label: Text(project.pageLabel(p, S.pageN)),
+                        selected: p == _page,
+                        onSelected: (_) => setState(() => _page = p),
+                      ),
+                  ],
+                ),
+              ),
+            AspectRatio(
+              aspectRatio: cols / rows * 1.4,
+              child: Column(
+                children: List.generate(
+                  rows,
+                  (r) => Expanded(
+                    child: Row(
+                      children: List.generate(cols, (c) {
+                        final int i = project.globalIndex(_page, r * cols + c);
+                        final pad = project.padSettings[i];
+                        final bool isCurrent = i == widget.current;
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: Material(
+                              color: pad.hasSample ? pad.color : Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(4),
+                              child: InkWell(
+                                onTap: isCurrent ? null : () => Navigator.pop(context, i),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: isCurrent
+                                      ? BoxDecoration(
+                                          border: Border.all(color: Colors.black, width: 2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        )
+                                      : null,
+                                  child: Text(
+                                    isCurrent ? '(${S.thisPad})' : pad.caption,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: pad.hasSample ? pad.textColor : Colors.black54,
+                                      fontStyle: isCurrent ? FontStyle.italic : null,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
+                        );
+                      }),
+                    ),
                   ),
-                )),
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(S.cancel))],

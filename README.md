@@ -4,6 +4,15 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.2.0
+
+- **Plusieurs pages (onglets) par projet** : ajouter, renommer, dupliquer, déplacer, supprimer
+  (appui long sur un onglet). Les sons continuent de jouer quand on change de page ; un point
+  vert signale une page dont un son est en cours. STOP et groupes d'exclusion valent pour tout le projet.
+- Échanger / dupliquer un pad vers une autre page.
+- Bouton STOP deux fois moins large, aligné à droite.
+- Les projets des versions précédentes s'ouvrent comme un projet d'une seule page.
+
 ## Nouveautés de la v2.1.0
 
 - Interface **en français ou en anglais** (choix dans Réglages > Langue ; par défaut la langue du téléphone).

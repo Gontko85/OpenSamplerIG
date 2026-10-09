@@ -35,33 +35,33 @@ Future<void> main() async {
 
   // Let all pads mix together: without this, every new sound would request
   // exclusive audio focus and Android would pause the pads already playing.
-  await AudioPlayer.global.setAudioContext(AudioContext(
-    android: const AudioContextAndroid(
-      isSpeakerphoneOn: false,
-      stayAwake: true,
-      contentType: AndroidContentType.music,
-      usageType: AndroidUsageType.media,
-      audioFocus: AndroidAudioFocus.none,
+  await AudioPlayer.global.setAudioContext(
+    AudioContext(
+      android: const AudioContextAndroid(
+        isSpeakerphoneOn: false,
+        stayAwake: true,
+        contentType: AndroidContentType.music,
+        usageType: AndroidUsageType.media,
+        audioFocus: AndroidAudioFocus.none,
+      ),
+      iOS: AudioContextIOS(
+        category: AVAudioSessionCategory.playback,
+        options: const {AVAudioSessionOptions.mixWithOthers},
+      ),
     ),
-    iOS: AudioContextIOS(
-      category: AVAudioSessionCategory.playback,
-      options: const {AVAudioSessionOptions.mixWithOthers},
-    ),
-  ));
+  );
 
   final settings = await loadSettings();
 
-  runApp(MaterialApp(
-    title: 'Open Sampler IG',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
-    darkTheme: ThemeData(
-      brightness: Brightness.dark,
-      colorSchemeSeed: Colors.blueGrey,
-      useMaterial3: true,
+  runApp(
+    MaterialApp(
+      title: 'Open Sampler IG',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+      darkTheme: ThemeData(brightness: Brightness.dark, colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+      home: PadScreen(settings),
     ),
-    home: PadScreen(settings),
-  ));
+  );
 }
 
 //==============================================================================

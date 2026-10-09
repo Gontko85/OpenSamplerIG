@@ -55,8 +55,7 @@ class SampleStore {
     return target;
   }
 
-  static Future<bool> exists(String path) async =>
-      path.isNotEmpty && await File(path).exists();
+  static Future<bool> exists(String path) async => path.isNotEmpty && await File(path).exists();
 }
 
 //==============================================================================

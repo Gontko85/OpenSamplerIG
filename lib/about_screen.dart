@@ -17,12 +17,15 @@ class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
   Widget _link(String text, String url) => InkWell(
-        onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Text(text, style: const TextStyle(color: Colors.blueGrey, decoration: TextDecoration.underline)),
-        ),
-      );
+    onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.blueGrey, decoration: TextDecoration.underline),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {

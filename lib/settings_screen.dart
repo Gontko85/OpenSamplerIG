@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 
 import 'settings.dart';
+import 'l10n.dart';
 
 //==============================================================================
 
@@ -25,8 +26,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   static const List<int> _gridSizes = [1, 2, 3, 4, 5, 6, 7, 8];
   static const List<String> _fontSizes = ['Default', '12', '18', '24', '32', '40', '48', '56', '64'];
-  static const Map<int, String> _fades = {
-    0: 'Off (cut)',
+  static Map<int, String> get _fades => {
+    0: S.fadeOff,
     300: '0.3 s',
     500: '0.5 s',
     1000: '1 s',
@@ -56,30 +57,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final gridItems = {for (final n in _gridSizes) n: '$n'};
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Settings")),
+      appBar: AppBar(title: Text(S.settings)),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
-          const Text("Project Settings", style: header),
+          Text(S.projectSettings, style: header),
           const SizedBox(height: 8),
-          _dropdownRow<int>('Horizontal Pads', _s.x, gridItems, (v) => _s.x = v),
-          _dropdownRow<int>('Vertical Pads', _s.y, gridItems, (v) => _s.y = v),
+          _dropdownRow<int>(S.horizontalPads, _s.x, gridItems, (v) => _s.x = v),
+          _dropdownRow<int>(S.verticalPads, _s.y, gridItems, (v) => _s.y = v),
           const SizedBox(height: 28),
-          const Text("Global Settings", style: header),
+          Text(S.globalSettings, style: header),
           const SizedBox(height: 8),
-          _dropdownRow<String>('Font Size', GlobalPrefs.fontSize, {for (final f in _fontSizes) f: f},
+          _dropdownRow<String>(S.language, S.code, const {'fr': 'Français', 'en': 'English'},
+              (v) => setLanguage(v)),
+          _dropdownRow<String>(S.fontSize, GlobalPrefs.fontSize,
+              {for (final f in _fontSizes) f: f == 'Default' ? S.fontDefault : f},
               (v) => GlobalPrefs.fontSize = v),
-          _dropdownRow<int>('Fade out when stopping', GlobalPrefs.fadeMs, _fades,
+          _dropdownRow<int>(S.fadeOut, GlobalPrefs.fadeMs, _fades,
               (v) => GlobalPrefs.fadeMs = v),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Show remaining time on pads'),
+            title: Text(S.showRemaining),
             value: GlobalPrefs.showRemaining,
             onChanged: (v) => setState(() => GlobalPrefs.showRemaining = v),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Keep screen on'),
+            title: Text(S.keepScreenOn),
             value: GlobalPrefs.keepScreenOn,
             onChanged: (v) => setState(() => GlobalPrefs.keepScreenOn = v),
           ),

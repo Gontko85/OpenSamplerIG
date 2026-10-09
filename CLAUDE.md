@@ -6,8 +6,9 @@ Méthode : plans phase par phase. Interface encore en anglais (traduction FR pr�
 ## Phases
 - Phase 1 (v2.0.0, livrée) : portage Flutter 3, copie des sons dans l'app, fix nom de pad,
   progression/temps restant, état visible, groupes d'exclusion, fondu, écran allumé, mode scène.
-- Phase 2 (à faire) : export/import projet avec sons, déplacer/échanger/dupliquer un pad,
-  volume général, (palette déjà faite), app en français.
+- Phase 2 (v2.1.0, livrée) : gros bouton STOP, « Retirer » efface aussi le nom, export/import
+  projet (.zip), échanger/déplacer/dupliquer un pad, interface FR/EN, nouvelle icône
+  (source : assets/icon/logo_circle.png). Volume général écarté par Ivan.
 - Plus tard : plusieurs pages de pads, point de départ/fin d'un son.
 
 ## Compiler dans une session cloud
@@ -23,6 +24,8 @@ Méthode : plans phase par phase. Interface encore en anglais (traduction FR pr�
 - Incrémenter `version:` dans pubspec.yaml (versionCode) à chaque release.
 
 ## Points techniques
+- Textes : tout passe par `S` (lib/l10n.dart) — ne pas écrire de texte en dur dans les écrans.
+- Versions split-per-abi : versionCode = 1000 × ABI + build (arm64 = 2xxx).
 - Contexte audio global avec `AndroidAudioFocus.none`, sinon les pads se coupent entre eux.
 - Pads « courts » = PlayerMode.lowLatency (SoundPool) : aucune position ni fin de lecture,
   d'où l'horloge interne dans `PadVoice` et la durée sondée/mise en cache (`durationMs`).

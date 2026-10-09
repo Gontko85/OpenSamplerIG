@@ -13,6 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'l10n.dart';
 import 'pad_screen.dart';
 import 'settings.dart';
 
@@ -30,6 +31,7 @@ Future<void> main() async {
   preferences = await SharedPreferences.getInstance();
   documentDirectory = await getApplicationDocumentsDirectory();
   packageInfo = await PackageInfo.fromPlatform();
+  loadLanguage();
 
   // Let all pads mix together: without this, every new sound would request
   // exclusive audio focus and Android would pause the pads already playing.

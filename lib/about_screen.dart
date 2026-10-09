@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'main.dart';
+import 'l10n.dart';
 
 //==============================================================================
 
@@ -26,28 +27,28 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("About")),
+      appBar: AppBar(title: Text(S.about)),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
           Text("Open Sampler IG v${packageInfo.version}", style: const TextStyle(fontSize: 24)),
           const Divider(),
-          const Text("Simple Sampling / Sound Board app for Android"),
+          Text(S.aboutTagline),
           const SizedBox(height: 16),
-          const Text("Original app", style: TextStyle(fontSize: 18)),
+          Text(S.originalApp, style: const TextStyle(fontSize: 18)),
           const Divider(),
           const Text("Developed by Leszek \"Лешы\" Szczepański — Cherry Tree Studio, 2021"),
           _link('Open Sampler @ GitHub', 'https://github.com/trvekvltgames/opensampler'),
           const SizedBox(height: 16),
-          const Text("This modified version", style: TextStyle(fontSize: 18)),
+          Text(S.thisVersion, style: const TextStyle(fontSize: 18)),
           const Divider(),
-          const Text("Modernised and extended by Ivan Gontcharenko — IG Littoral Labs, 2026"),
-          const Text("(progress bars, exclusion groups, fade out, stage mode…)"),
-          _link('Contact', 'https://www.linkedin.com/in/ivangontcharenko'),
+          Text(S.modifiedBy),
+          Text(S.modifiedWhat),
+          _link(S.contact, 'https://www.linkedin.com/in/ivangontcharenko'),
           const SizedBox(height: 16),
-          const Text("Licence", style: TextStyle(fontSize: 18)),
+          Text(S.licence, style: const TextStyle(fontSize: 18)),
           const Divider(),
-          const Text("Released under the European Union Public Licence (EUPL) v1.2"),
+          Text(S.licenceText),
           _link('EUPL v1.2', 'https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12'),
         ],
       ),

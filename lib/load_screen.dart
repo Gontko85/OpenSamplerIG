@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'dialogs.dart';
 import 'main.dart';
 import 'settings.dart';
+import 'l10n.dart';
 
 //==============================================================================
 
@@ -31,14 +32,14 @@ class _LoadScreenState extends State<LoadScreen> {
   String _nameOf(File f) => p.basenameWithoutExtension(f.path);
 
   Future<void> _onChoose(File file) async {
-    final ok = await confirm(context, title: Text('Do you want to open project ${_nameOf(file)}?'));
+    final ok = await confirm(context, title: Text(S.openConfirm(_nameOf(file))));
     if (!ok || !mounted) return;
     preferences.setString(GlobalPrefs.lastFileKey, file.absolute.path);
     Navigator.pop(context, file);
   }
 
   Future<void> _onDelete(File file) async {
-    final ok = await confirm(context, title: Text('Do you want to delete project ${_nameOf(file)}?'));
+    final ok = await confirm(context, title: Text(S.deleteConfirm(_nameOf(file))));
     if (!ok) return;
     try {
       await file.delete();
@@ -49,9 +50,9 @@ class _LoadScreenState extends State<LoadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Open Project")),
+      appBar: AppBar(title: Text(S.openProject)),
       body: widget.files.isEmpty
-          ? const Center(child: Text('No saved project yet.\nUse "Save Project" first.', textAlign: TextAlign.center))
+          ? Center(child: Text(S.noProject, textAlign: TextAlign.center))
           : ListView.separated(
               itemCount: widget.files.length,
               separatorBuilder: (_, _) => const Divider(height: 1),

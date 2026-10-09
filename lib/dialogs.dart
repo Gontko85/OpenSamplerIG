@@ -5,6 +5,7 @@
 //==============================================================================
 
 import 'package:flutter/material.dart';
+import 'l10n.dart';
 
 /// Yes/No confirmation (replaces the abandoned confirm_dialog package).
 Future<bool> confirm(BuildContext context, {Widget? title, Widget? content}) async {
@@ -14,8 +15,8 @@ Future<bool> confirm(BuildContext context, {Widget? title, Widget? content}) asy
       title: title,
       content: content,
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('OK')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(S.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(S.ok)),
       ],
     ),
   );

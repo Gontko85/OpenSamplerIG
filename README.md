@@ -4,6 +4,15 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.1.0
+
+- Interface **en français ou en anglais** (choix dans Réglages > Langue ; par défaut la langue du téléphone).
+- Grand **bouton STOP rouge** en haut (moitié de l'écran) ; 2e appui pendant le fondu = coupure immédiate.
+- **Export / import** d'un projet complet (.zip avec tous les sons) pour passer d'un appareil à l'autre.
+- **Échanger / déplacer / dupliquer** un pad depuis ses réglages.
+- « Retirer » le son d'un pad retire aussi son nom.
+- Nouvelle icône d'application.
+
 ## Nouveautés de la v2.0.0
 
 - Portage Flutter 3 / Dart 3 (null safety), Android 7 → Android 16.
@@ -55,6 +64,8 @@ ne doivent jamais être poussés sur le dépôt.
 | `lib/pad_tile.dart` | Rendu d'un pad |
 | `lib/pad_settings_screen.dart` | Réglages d'un pad |
 | `lib/settings_screen.dart` | Réglages du projet et globaux |
+| `lib/project_archive.dart` | Export / import d'un projet (.zip) |
+| `lib/l10n.dart` | Textes de l'interface FR / EN |
 
 ## Licence
 

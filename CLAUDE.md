@@ -10,7 +10,14 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   projet (.zip), échanger/déplacer/dupliquer un pad, interface FR/EN, nouvelle icône
   (source : assets/icon/logo_circle.png). Volume général écarté par Ivan.
 - v2.2.0 (livrée) : pages/onglets par projet, STOP réduit (25 % de largeur, à droite).
-- Plus tard : point de départ/fin d'un son.
+- Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
+  - v2.3 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
+    dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,
+    verrouillage de l'orientation.
+  - v2.4 proposée : import de plusieurs sons d'un coup (remplit les pads vides), pad « playlist »
+    (morceau suivant / aléatoire à chaque appui), baisse auto de la musique (ducking) pour pads prioritaires.
+  - Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
+    télécommande/pédale Bluetooth.
 
 ## Compiler dans une session cloud
 - Installer Flutter stable (storage.googleapis.com) + Android cmdline-tools (dl.google.com),

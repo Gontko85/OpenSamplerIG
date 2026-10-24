@@ -4,6 +4,16 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.3.0
+
+- **Export / import des gros projets** : le .zip est écrit et relu *en flux*, son par son, sans
+  jamais être chargé en mémoire (testé à 1,2 Go et 4,5 Go). Fin des « out of memory ».
+  À l'export : « Enregistrer dans un dossier » ou « Envoyer / partager » (Quick Share, Drive…).
+- **Importer plusieurs sons d'un coup** : remplit les touches vides de la page affichée puis des
+  suivantes (ajout de pages proposé), nom = nom du fichier, « son long » réglé selon la durée.
+- **Réglages d'un pad sur un seul écran** : nom modifiable directement sur l'aperçu, boucle / son
+  long / groupe sur une ligne, comportement en boutons, palettes de couleurs (+ couleur libre).
+
 ## Nouveautés de la v2.2.0
 
 - **Plusieurs pages (onglets) par projet** : ajouter, renommer, dupliquer, déplacer, supprimer
@@ -75,6 +85,7 @@ ne doivent jamais être poussés sur le dépôt.
 | `lib/settings_screen.dart` | Réglages du projet et globaux |
 | `lib/project_archive.dart` | Export / import d'un projet (.zip) |
 | `lib/l10n.dart` | Textes de l'interface FR / EN |
+| `lib/native_files.dart` + `MainActivity.kt` | Enregistrer / partager un gros fichier sans le charger en mémoire |
 
 ## Licence
 

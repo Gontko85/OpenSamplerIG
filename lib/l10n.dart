@@ -91,9 +91,40 @@ class Strings {
     'The grid applies to every page of the project.',
   );
 
+  // Bulk import
+  String get bulkImport => _t('Importer plusieurs sons…', 'Import several sounds…');
+  String get bulkImporting => _t('Import des sons…', 'Importing sounds…');
+  String bulkTooMany(int n, int free) => _t(
+    '$n sons pour $free touche${free > 1 ? 's' : ''} libre${free > 1 ? 's' : ''}',
+    '$n sounds for $free free pad${free > 1 ? 's' : ''}',
+  );
+  String bulkAddPages(int p) => _t(
+    'Ajouter $p page${p > 1 ? 's' : ''} à la fin du projet pour tout placer ?',
+    'Add $p page${p > 1 ? 's' : ''} at the end of the project to fit them all?',
+  );
+  String bulkAddPagesButton(int p) =>
+      _t('Ajouter $p page${p > 1 ? 's' : ''}', 'Add $p page${p > 1 ? 's' : ''}');
+  String bulkOnlyFirst(int n) => _t('Seulement les $n premiers', 'Only the first $n');
+  String bulkDone(int n, String pages, int failed) => _t(
+    '$n son${n > 1 ? 's' : ''} importé${n > 1 ? 's' : ''} ($pages)${failed > 0 ? ' — $failed en échec' : ''}',
+    '$n sound${n > 1 ? 's' : ''} imported ($pages)${failed > 0 ? ' — $failed failed' : ''}',
+  );
+
   // Export / import
   String get exporting => _t('Préparation de l\'export…', 'Preparing export…');
   String get importing => _t('Import en cours…', 'Importing…');
+  String get importCopying => _t('Lecture du fichier…', 'Reading the file…');
+  String progressCount(int d, int t) => _t('$d / $t sons', '$d / $t sounds');
+  String exportReady(String name, String size) =>
+      _t('Export prêt : $name ($size)', 'Export ready: $name ($size)');
+  String get exportSave => _t('Enregistrer dans un dossier', 'Save to a folder');
+  String get exportSaveHint =>
+      _t('Téléchargements, carte SD, clé USB, Drive…', 'Downloads, SD card, USB drive, Drive…');
+  String get exportShare => _t('Envoyer / partager', 'Send / share');
+  String get exportShareHint => _t(
+    'Quick Share vers une autre tablette, Drive, Bluetooth…',
+    'Quick Share to another tablet, Drive, Bluetooth…',
+  );
   String exportDone(String name) => _t('Projet exporté : $name', 'Project exported: $name');
   String get exportCancelled => _t('Export annulé', 'Export cancelled');
   String exportFailed(Object e) => _t('Échec de l\'export : $e', 'Export failed: $e');
@@ -134,9 +165,12 @@ class Strings {
   String get caption => _t('Nom affiché :', 'Caption:');
   String get set => _t('Modifier', 'Set');
   String get padNamePrompt => _t('Nom du pad', 'Pad name');
+  String get loopShort => _t('En boucle', 'Loop');
+  String get longShort => _t('Son long', 'Long sound');
+  String get groupShort => _t('Groupe', 'Group');
   String get looped => _t('En boucle :', 'Looped:');
   String get longSound => _t('Son long (musique, > 5 s) :', 'Long sound (music, > 5 s):');
-  String get behaviour => _t('Si on appuie pendant la lecture :', 'Behaviour when pressed while playing:');
+  String get behaviour => _t('Appui pendant la lecture :', 'Press while playing:');
   String behaviourName(String key) => switch (key) {
     'Stop' => _t('Arrêter', 'Stop'),
     'Pause' => _t('Pause', 'Pause'),
@@ -257,10 +291,15 @@ class Strings {
             '',
             'Dans les réglages d\'un pad : « Échanger / déplacer » pour intervertir deux pads (choisir un pad vide pour déplacer), « Dupliquer vers » pour copier le pad ailleurs, y compris sur une autre page.',
           ),
+          ('Importer plusieurs sons', null),
+          (
+            '',
+            'Menu ⋮ > Importer plusieurs sons : sélectionnez autant de fichiers que vous voulez. Ils remplissent, par ordre alphabétique, les touches vides de la page affichée puis des pages suivantes (l\'appli propose d\'ajouter des pages s\'il en manque). Le nom de la touche reprend celui du fichier et l\'option « son long » est réglée selon la durée.',
+          ),
           ('Exporter / importer', null),
           (
             '',
-            'Menu ⋮ > Exporter : crée un fichier .zip contenant le projet et tous ses sons, à enregistrer (Téléchargements, Drive…). Sur un autre appareil : menu ⋮ > Importer, puis choisir ce fichier.',
+            'Menu ⋮ > Exporter : crée un fichier .zip contenant le projet et tous ses sons, à enregistrer dans un dossier (Téléchargements, carte SD, clé USB…) ou à envoyer directement (Quick Share vers l\'autre tablette, Drive…). Sur l\'autre appareil : menu ⋮ > Importer un projet, puis choisir ce fichier. Les gros projets (plusieurs Go) sont gérés : prévoir l\'espace libre correspondant.',
           ),
         ]
       : [
@@ -319,10 +358,15 @@ class Strings {
             '',
             'In a pad\'s settings: "Swap / move" exchanges two pads (pick an empty pad to move), "Duplicate to" copies the pad elsewhere, including on another page.',
           ),
+          ('Import several sounds', null),
+          (
+            '',
+            'Menu ⋮ > Import several sounds: pick as many files as you like. They fill, in alphabetical order, the empty pads of the current page then of the following pages (the app offers to add pages if needed). Pad names come from the file names and "long sound" is set from the length.',
+          ),
           ('Export / import', null),
           (
             '',
-            'Menu ⋮ > Export creates a .zip file with the project and all its sounds, to save anywhere (Downloads, Drive…). On another device: menu ⋮ > Import and pick that file.',
+            'Menu ⋮ > Export creates a .zip file with the project and all its sounds, to save in a folder (Downloads, SD card, USB drive…) or send directly (Quick Share to the other tablet, Drive…). On the other device: menu ⋮ > Import a project and pick that file. Big projects (several GB) are fine: just keep that much free space.',
           ),
         ];
 }

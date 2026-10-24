@@ -79,11 +79,20 @@ void main() {
     final f = File('${src.path}/hymne.mp3')..writeAsBytesSync(List.filled(1000, 7));
     final s = demo();
     s.padsOfPage(1)[3].sample = f.path;
-    final zip = await ProjectArchive.export(s);
-    final (r, count) = await ProjectArchive.import(zip);
+    final zip = '${src.path}/p.zip';
+    await ProjectArchive.exportToFile(s, zip);
+    final (r, count) = await ProjectArchive.importFromFile(zip);
     expect(count, 1);
     expect(r.pageCount, 3);
     expect(r.pageNames[1], 'Mi-temps');
     expect(File(r.padsOfPage(1)[3].sample).existsSync(), true);
+  });
+
+  test('empty slots for bulk import start at the current page', () {
+    final s = demo(); // 3 pages of 4 pads
+    s.padsOfPage(1)[0].sample = '/a.mp3';
+    s.padsOfPage(1)[2].sample = '/b.mp3';
+    expect(s.emptySlotsFrom(1), [5, 7, 8, 9, 10, 11]);
+    expect(s.emptySlotsFrom(0).length, 10);
   });
 }

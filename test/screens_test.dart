@@ -64,18 +64,32 @@ void main() {
     });
   }
 
-  testWidgets('pad settings fr', (tester) async {
-    setLanguage('fr');
-    await tester.runAsync(_loadFonts);
-    tester.view.physicalSize = const Size(1080, 3000);
-    tester.view.devicePixelRatio = 2.75;
-    final s = _demo();
-    await tester.pumpWidget(MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
-      home: PadSettingsScreen(0, 0, 0, s),
-    ));
-    await tester.pump();
-    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/pad_settings_fr.png'));
-  });
+  // Phone (393 × 760 dp, i.e. a small phone without the status bar) and tablet.
+  for (final (name, size, ratio) in [
+    ('phone', const Size(1080, 2090), 2.75),
+    ('tablet', const Size(1600, 2560), 2.0),
+  ]) {
+    testWidgets('pad settings fr $name fits without scrolling', (tester) async {
+      setLanguage('fr');
+      await tester.runAsync(_loadFonts);
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = ratio;
+      final s = _demo();
+      s.padSettings[0]
+        ..sample = '/sons/Entree_des_joueurs_2026.mp3'
+        ..long = true
+        ..group = 1
+        ..volume = 0.8;
+      await tester.pumpWidget(MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+        home: PadSettingsScreen(0, 0, 0, s),
+      ));
+      await tester.pump();
+      // No scrolling needed: the scroll view has nothing to scroll.
+      final pos = tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+      expect(pos.maxScrollExtent, 0, reason: 'the pad settings must fit on one screen');
+      await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/pad_settings_fr_$name.png'));
+    });
+  }
 }

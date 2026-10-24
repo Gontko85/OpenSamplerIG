@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'about_screen.dart';
@@ -19,16 +20,28 @@ import 'help_screen.dart';
 import 'l10n.dart';
 import 'load_screen.dart';
 import 'main.dart';
+import 'native_files.dart';
 import 'pad_settings_screen.dart';
 import 'pad_tile.dart';
 import 'project_archive.dart';
 import 'sample_engine.dart';
+import 'sample_store.dart';
 import 'settings.dart';
 import 'settings_screen.dart';
 
 //==============================================================================
 
-enum MenuAction { newProject, saveProject, openProject, exportProject, importProject, settings, help, about }
+enum MenuAction {
+  newProject,
+  saveProject,
+  openProject,
+  bulkImport,
+  exportProject,
+  importProject,
+  settings,
+  help,
+  about,
+}
 
 //==============================================================================
 
@@ -382,53 +395,235 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<T?> _withProgress<T>(String label, Future<T> Function() job) async {
+  /// Runs [job] behind a modal progress dialog. The job reports its progress
+  /// through the given notifier ("label", done, total).
+  Future<T?> _withProgress<T>(String label, Future<T> Function(ValueNotifier<(String, int, int)>) job) async {
+    final progress = ValueNotifier<(String, int, int)>((label, 0, 0));
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => PopScope(
         canPop: false,
         child: AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 20),
-              Expanded(child: Text(label)),
-            ],
+          content: ValueListenableBuilder<(String, int, int)>(
+            valueListenable: progress,
+            builder: (_, v, _) {
+              final (text, done, total) = v;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(text),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(value: total > 0 ? done / total : null),
+                  if (total > 0) ...[
+                    const SizedBox(height: 8),
+                    Text(S.progressCount(done, total), style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
     try {
-      return await job();
+      return await job(progress);
     } finally {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
     }
   }
 
   Future<void> _goToExport() async {
+    final fileName = ProjectArchive.fileNameFor(_settings);
+    final String zipPath;
     try {
-      final bytes = await _withProgress(S.exporting, () => ProjectArchive.export(_settings));
-      if (bytes == null) return;
-      final fileName = ProjectArchive.fileNameFor(_settings);
-      final Uri? saved = await FilePicker.saveFile(
-        fileName: fileName,
-        bytes: bytes,
-        mimeType: 'application/zip',
-      );
-      _snack(saved == null ? S.exportCancelled : S.exportDone(fileName));
+      // Old exports are removed first: they live in the app cache only.
+      final exportDir = Directory(p.join((await getTemporaryDirectory()).path, 'exports'));
+      if (await exportDir.exists()) await exportDir.delete(recursive: true);
+      zipPath = p.join(exportDir.path, fileName);
+      final ok = await _withProgress(S.exporting, (progress) async {
+        await ProjectArchive.exportToFile(
+          _settings,
+          zipPath,
+          onProgress: (d, t) => progress.value = (S.exporting, d, t),
+        );
+        return true;
+      });
+      if (ok != true || !mounted) return;
+    } catch (e) {
+      _snack(S.exportFailed(e));
+      return;
+    }
+
+    // Where should the file go?
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                S.exportReady(fileName, _fileSize(zipPath)),
+                style: Theme.of(ctx).textTheme.titleSmall,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.save_alt),
+              title: Text(S.exportSave),
+              subtitle: Text(S.exportSaveHint),
+              onTap: () => Navigator.pop(ctx, 'save'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.share),
+              title: Text(S.exportShare),
+              subtitle: Text(S.exportShareHint),
+              onTap: () => Navigator.pop(ctx, 'share'),
+            ),
+          ],
+        ),
+      ),
+    );
+    try {
+      if (choice == 'save') {
+        final saved = await NativeFiles.saveFile(zipPath, fileName);
+        _snack(saved ? S.exportDone(fileName) : S.exportCancelled);
+      } else if (choice == 'share') {
+        await NativeFiles.shareFile(zipPath, title: fileName);
+      }
     } catch (e) {
       _snack(S.exportFailed(e));
     }
   }
 
+  /// Several sounds at once: they fill the empty pads of the current page,
+  /// then of the following pages (new pages are added if the user agrees).
+  Future<void> _bulkImport() async {
+    final List<PlatformFile> picked = List.of(await FilePicker.pickFiles(type: FileType.audio));
+    if (picked.isEmpty || !mounted) return;
+    // Alphabetical order (natural: "2" before "10"), so the result is predictable.
+    picked.sort((a, b) => _naturalCompare(a.name.toLowerCase(), b.name.toLowerCase()));
+
+    List<int> slots = _settings.emptySlotsFrom(_page);
+    int count = picked.length;
+    if (slots.length < count) {
+      final int missing = count - slots.length;
+      final int pagesNeeded = (missing / _settings.padsPerPage).ceil();
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(S.bulkTooMany(count, slots.length)),
+          content: Text(S.bulkAddPages(pagesNeeded)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(S.cancel)),
+            if (slots.isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'fit'),
+                child: Text(S.bulkOnlyFirst(slots.length)),
+              ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'add'),
+              child: Text(S.bulkAddPagesButton(pagesNeeded)),
+            ),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      if (choice == 'add') {
+        await _changePages(() {
+          for (int i = 0; i < pagesNeeded; i++) {
+            _settings.addPage();
+          }
+        });
+        slots = _settings.emptySlotsFrom(_page);
+      } else {
+        count = slots.length;
+      }
+    }
+
+    final List<int> filled = [];
+    int failed = 0;
+    await _withProgress(S.bulkImporting, (progress) async {
+      for (int k = 0; k < count; k++) {
+        progress.value = (S.bulkImporting, k, count);
+        final f = picked[k];
+        final int index = slots[k];
+        try {
+          final stored = await SampleStore.import(f.name, f.readAsByteStream(), length: f.lengthSync());
+          final pad = _settings.padSettings[index];
+          pad.sample = stored;
+          pad.caption = p.basenameWithoutExtension(f.name);
+          // "Long sound" chosen from the real length (music vs short jingle).
+          final d = await SampleEngine.probeDuration(stored);
+          pad.durationMs = d?.inMilliseconds ?? 0;
+          pad.long = d == null ? (f.lengthSync() ?? 0) > 1024 * 1024 : d.inMilliseconds > 5000;
+          filled.add(index);
+        } catch (_) {
+          failed++;
+        }
+      }
+      progress.value = (S.bulkImporting, count, count);
+      await _settings.save();
+      for (final i in filled) {
+        await _engine.reloadPad(i, _settings.padSettings[i]);
+      }
+      _saveIfDirty();
+      return true;
+    });
+    if (!mounted) return;
+    setState(() {});
+    final pages = filled
+        .map(_settings.pageOf)
+        .toSet()
+        .map((pg) => _settings.pageLabel(pg, S.pageN))
+        .join(', ');
+    _snack(S.bulkDone(filled.length, pages, failed));
+  }
+
+  static int _naturalCompare(String a, String b) {
+    final re = RegExp(r'(\d+)|(\D+)');
+    final ma = re.allMatches(a).toList(), mb = re.allMatches(b).toList();
+    for (int i = 0; i < ma.length && i < mb.length; i++) {
+      final x = ma[i].group(0)!, y = mb[i].group(0)!;
+      final nx = int.tryParse(x), ny = int.tryParse(y);
+      final c = (nx != null && ny != null) ? nx.compareTo(ny) : x.compareTo(y);
+      if (c != 0) return c;
+    }
+    return ma.length.compareTo(mb.length);
+  }
+
+  String _fileSize(String path) {
+    final int bytes = File(path).lengthSync();
+    if (bytes >= 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} Go';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} Mo';
+  }
+
   Future<void> _goToImport() async {
     final PlatformFile? picked = await FilePicker.pickFile(type: FileType.any);
     if (picked == null) return;
+    File? tmpCopy;
     try {
-      final result = await _withProgress(S.importing, () async {
-        final bytes = await picked.readAsBytes();
-        return ProjectArchive.import(bytes);
+      final result = await _withProgress(S.importing, (progress) async {
+        // Get the zip as a real file, copied in a stream if needed (never in memory).
+        String? zipPath = picked.path;
+        if (zipPath == null || !await File(zipPath).exists()) {
+          progress.value = (S.importCopying, 0, 0);
+          tmpCopy = File(p.join((await getTemporaryDirectory()).path, 'import.zip'));
+          final sink = tmpCopy!.openWrite();
+          try {
+            await sink.addStream(picked.readAsByteStream());
+          } finally {
+            await sink.close();
+          }
+          zipPath = tmpCopy!.path;
+        }
+        return ProjectArchive.importFromFile(
+          zipPath,
+          onProgress: (d, t) => progress.value = (S.importing, d, t),
+        );
       });
       if (result == null) return;
       final (imported, count) = result;
@@ -441,6 +636,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       _snack(S.notAProject);
     } catch (e) {
       _snack(S.importFailed(e));
+    } finally {
+      if (tmpCopy != null && await tmpCopy!.exists()) await tmpCopy!.delete();
     }
   }
 
@@ -454,6 +651,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
         break;
       case MenuAction.openProject:
         _goToOpen();
+        break;
+      case MenuAction.bulkImport:
+        _bulkImport();
         break;
       case MenuAction.exportProject:
         _goToExport();
@@ -508,6 +708,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                 PopupMenuItem(value: MenuAction.newProject, child: Text(S.newProject)),
                 PopupMenuItem(value: MenuAction.saveProject, child: Text(S.saveProject)),
                 PopupMenuItem(value: MenuAction.openProject, child: Text(S.openProject)),
+                const PopupMenuDivider(),
+                PopupMenuItem(value: MenuAction.bulkImport, child: Text(S.bulkImport)),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: MenuAction.exportProject, child: Text(S.exportProject)),
                 PopupMenuItem(value: MenuAction.importProject, child: Text(S.importProject)),

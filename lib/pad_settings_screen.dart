@@ -35,8 +35,15 @@ class PadSettingsScreen extends StatefulWidget {
 
 class _PadSettingsScreenState extends State<PadSettingsScreen> {
   bool _importing = false;
+  late final TextEditingController _caption = TextEditingController(text: _pad.caption);
 
   PadSettings get _pad => widget.project.padSettings[widget.index];
+
+  @override
+  void dispose() {
+    _caption.dispose();
+    super.dispose();
+  }
 
   //----------------------------------------------------------------------------
 
@@ -72,6 +79,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
       _pad.durationMs = 0;
       if (autoCaption) {
         _pad.caption = p.basenameWithoutExtension(picked.name);
+        _caption.text = _pad.caption;
       }
       await widget.project.save();
     } catch (e) {
@@ -90,16 +98,30 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     _pad.sample = "";
     _pad.durationMs = 0;
     _pad.caption = "${widget.project.indexInPage(widget.index) + 1}";
+    _caption.text = _pad.caption;
     await widget.project.save();
     setState(() {});
   }
 
-  Future<void> _onChangeCaption() async {
-    final text = await askText(context, S.padNamePrompt, initial: _pad.caption);
-    if (text == null) return;
-    _pad.caption = text;
-    await widget.project.save();
-    setState(() {});
+  Future<void> _customColor({required bool text}) async {
+    Color picked = text ? _pad.textColor : _pad.color;
+    final ok = await confirm(
+      context,
+      title: Text(text ? S.textColor : S.padColor),
+      content: SingleChildScrollView(
+        child: SlidePicker(
+          pickerColor: picked,
+          onColorChanged: (c) => picked = c.withAlpha(255),
+          colorModel: ColorModel.rgb,
+          enableAlpha: false,
+          displayThumbColor: true,
+          showParams: false,
+          showIndicator: true,
+        ),
+      ),
+    );
+    if (!ok) return;
+    setState(() => text ? _pad.textColor = picked : _pad.color = picked);
   }
 
   //----------------------------------------------------------------------------
@@ -146,22 +168,37 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
   static const List<Color> _palette = [
     Color(0xFF9E9E9E),
     Color(0xFF424242),
-    Color(0xFFE53935),
-    Color(0xFFFB8C00),
-    Color(0xFFFDD835),
-    Color(0xFF43A047),
-    Color(0xFF00897B),
-    Color(0xFF039BE5),
-    Color(0xFF3949AB),
-    Color(0xFF8E24AA),
-    Color(0xFFD81B60),
+    Color(0xFF000000),
     Color(0xFFFFFFFF),
+    Color(0xFFE53935),
+    Color(0xFFD81B60),
+    Color(0xFF8E24AA),
+    Color(0xFF3949AB),
+    Color(0xFF039BE5),
+    Color(0xFF00897B),
+    Color(0xFF43A047),
+    Color(0xFF7CB342),
+    Color(0xFFFDD835),
+    Color(0xFFFB8C00),
+    Color(0xFF6D4C41),
+    Color(0xFF26C6DA),
+  ];
+
+  static const List<Color> _textPalette = [
+    Color(0xFF000000),
+    Color(0xFFFFFFFF),
+    Color(0xFF424242),
+    Color(0xFFFDD835),
+    Color(0xFFE53935),
+    Color(0xFF039BE5),
   ];
 
   @override
   Widget build(BuildContext context) {
-    const label = TextStyle(fontSize: 16);
+    final theme = Theme.of(context);
+    final label = theme.textTheme.labelLarge;
     final String sampleName = _pad.hasSample ? _stripCopySuffix(p.basename(_pad.sample)) : S.none;
+    const gap = SizedBox(height: 10);
 
     return Scaffold(
       appBar: AppBar(
@@ -173,203 +210,239 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                   widget.col + 1,
                 )
               : S.padTitle(widget.row + 1, widget.col + 1),
+          style: const TextStyle(fontSize: 18),
         ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(12),
-        children: <Widget>[
-          // Live preview of the pad.
-          Container(
-            height: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: _pad.color, borderRadius: BorderRadius.circular(6)),
-            child: Text(_pad.caption, style: TextStyle(color: _pad.textColor, fontSize: 18)),
+        actions: [
+          IconButton(
+            tooltip: S.swapWith,
+            icon: const Icon(Icons.swap_horiz),
+            onPressed: () => _arrange(copy: false),
           ),
-          const SizedBox(height: 12),
-
-          Text(S.soundClip, style: label),
-          Row(
-            children: <Widget>[
-              Expanded(child: Text(sampleName, overflow: TextOverflow.ellipsis)),
-              if (_importing)
-                const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              else ...[
-                if (_pad.hasSample)
-                  IconButton(
-                    tooltip: S.remove,
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: _onRemoveSample,
-                  ),
-                TextButton(onPressed: _onSelectSample, child: Text(S.select)),
-              ],
-            ],
-          ),
-          const Divider(),
-
-          Text(S.caption, style: label),
-          Row(
-            children: <Widget>[
-              Expanded(child: Text(_pad.caption, overflow: TextOverflow.ellipsis)),
-              TextButton(onPressed: _onChangeCaption, child: Text(S.set)),
-            ],
-          ),
-          const Divider(),
-
-          Text(S.arrange, style: label),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _arrange(copy: false),
-                icon: const Icon(Icons.swap_horiz),
-                label: Text(S.swapWith),
-              ),
-              OutlinedButton.icon(
-                onPressed: _pad.hasSample ? () => _arrange(copy: true) : null,
-                icon: const Icon(Icons.copy),
-                label: Text(S.copyTo),
-              ),
-            ],
-          ),
-          const Divider(),
-
-          Row(
-            children: <Widget>[
-              Text(S.looped, style: label),
-              const Spacer(),
-              Switch(value: _pad.looped, onChanged: (v) => setState(() => _pad.looped = v)),
-            ],
-          ),
-          const Divider(),
-
-          Row(
-            children: <Widget>[
-              Expanded(child: Text(S.longSound, style: label)),
-              Switch(
-                value: _pad.long,
-                onChanged: (v) => setState(() {
-                  _pad.long = v;
-                  _pad.durationMs = 0;
-                }),
-              ),
-            ],
-          ),
-          const Divider(),
-
-          Row(
-            children: <Widget>[
-              Expanded(child: Text(S.behaviour, style: label)),
-              DropdownButton<PressBehaviour>(
-                value: _pad.behaviour,
-                onChanged: (v) => setState(() => _pad.behaviour = v ?? PressBehaviour.restart),
-                items: PressBehaviour.values
-                    .map(
-                      (b) =>
-                          DropdownMenuItem(value: b, child: Text(S.behaviourName(pressBehaviourToString(b)))),
-                    )
-                    .toList(),
-              ),
-            ],
-          ),
-          const Divider(),
-
-          Row(
-            children: <Widget>[
-              Expanded(child: Text(S.group, style: label)),
-              DropdownButton<int>(
-                value: _pad.group,
-                onChanged: (v) => setState(() => _pad.group = v ?? 0),
-                items: List.generate(
-                  groupNames.length,
-                  (i) => DropdownMenuItem(value: i, child: Text(S.groupName(i))),
-                ),
-              ),
-            ],
-          ),
-          const Divider(),
-
-          Text(S.volume((_pad.volume * 100).round()), style: label),
-          Slider(
-            value: _pad.volume * 100.0,
-            min: 0,
-            max: 100,
-            divisions: 20,
-            label: (_pad.volume * 100.0).round().toString(),
-            onChanged: (double value) => setState(() => _pad.volume = value / 100.0),
-          ),
-          const Divider(),
-
-          Text(S.padColor, style: label),
-          const SizedBox(height: 8),
-          _PaletteRow(colors: _palette, onPick: (c) => setState(() => _pad.color = c)),
-          SlidePicker(
-            pickerColor: _pad.color,
-            onColorChanged: (Color c) => setState(() => _pad.color = c.withAlpha(255)),
-            colorModel: ColorModel.rgb,
-            enableAlpha: false,
-            displayThumbColor: true,
-            showParams: false,
-            showIndicator: false,
-          ),
-          const Divider(),
-
-          Text(S.textColor, style: label),
-          const SizedBox(height: 8),
-          _PaletteRow(colors: _palette, onPick: (c) => setState(() => _pad.textColor = c)),
-          SlidePicker(
-            pickerColor: _pad.textColor,
-            onColorChanged: (Color c) => setState(() => _pad.textColor = c.withAlpha(255)),
-            colorModel: ColorModel.rgb,
-            enableAlpha: false,
-            displayThumbColor: true,
-            showParams: false,
-            showIndicator: false,
+          IconButton(
+            tooltip: S.copyTo,
+            icon: const Icon(Icons.copy),
+            onPressed: _pad.hasSample ? () => _arrange(copy: true) : null,
           ),
         ],
       ),
+      // Everything fits on one screen; scrolling only kicks in on very small phones.
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Live preview = name field: type the pad name right on the pad.
+              Container(
+                height: 58,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(color: _pad.color, borderRadius: BorderRadius.circular(8)),
+                alignment: Alignment.center,
+                child: TextField(
+                  controller: _caption,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _pad.textColor, fontSize: 19, fontWeight: FontWeight.w600),
+                  cursorColor: _pad.textColor,
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    hintText: S.padNamePrompt,
+                    hintStyle: TextStyle(color: _pad.textColor.withValues(alpha: 0.5)),
+                    suffixIcon: Icon(Icons.edit, size: 16, color: _pad.textColor.withValues(alpha: 0.6)),
+                    suffixIconConstraints: const BoxConstraints(minWidth: 20),
+                  ),
+                  onChanged: (v) => _pad.caption = v,
+                ),
+              ),
+              gap,
+
+              // 2. Sound file.
+              Row(
+                children: [
+                  const Icon(Icons.music_note, size: 20),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(sampleName, overflow: TextOverflow.ellipsis, maxLines: 1)),
+                  if (_importing)
+                    const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else ...[
+                    if (_pad.hasSample)
+                      IconButton(
+                        tooltip: S.remove,
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: _onRemoveSample,
+                      ),
+                    FilledButton.tonal(onPressed: _onSelectSample, child: Text(S.select)),
+                  ],
+                ],
+              ),
+              gap,
+
+              // 3. Loop / long sound / exclusion group on one line.
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilterChip(
+                    avatar: const Icon(Icons.repeat, size: 18),
+                    label: Text(S.loopShort),
+                    selected: _pad.looped,
+                    showCheckmark: false,
+                    onSelected: (v) => setState(() => _pad.looped = v),
+                  ),
+                  FilterChip(
+                    avatar: const Icon(Icons.queue_music, size: 18),
+                    label: Text(S.longShort),
+                    tooltip: S.longSound,
+                    selected: _pad.long,
+                    showCheckmark: false,
+                    onSelected: (v) => setState(() {
+                      _pad.long = v;
+                      _pad.durationMs = 0;
+                    }),
+                  ),
+                  Tooltip(
+                    message: S.group,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${S.groupShort} ', style: label),
+                        DropdownButton<int>(
+                          value: _pad.group,
+                          isDense: true,
+                          onChanged: (v) => setState(() => _pad.group = v ?? 0),
+                          items: List.generate(
+                            groupNames.length,
+                            (i) => DropdownMenuItem(value: i, child: Text(S.groupName(i))),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              gap,
+
+              // 4. What a press does while the sound plays.
+              Text(S.behaviour, style: label),
+              const SizedBox(height: 4),
+              SegmentedButton<PressBehaviour>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                segments: [
+                  for (final b in [PressBehaviour.restart, PressBehaviour.stop, PressBehaviour.pause])
+                    ButtonSegment(value: b, label: Text(S.behaviourName(pressBehaviourToString(b)))),
+                ],
+                selected: {_pad.behaviour},
+                onSelectionChanged: (v) => setState(() => _pad.behaviour = v.first),
+              ),
+              gap,
+
+              // 5. Volume.
+              Row(
+                children: [
+                  const Icon(Icons.volume_up, size: 20),
+                  Expanded(
+                    child: Slider(
+                      value: _pad.volume * 100.0,
+                      min: 0,
+                      max: 100,
+                      divisions: 20,
+                      label: '${(_pad.volume * 100.0).round()} %',
+                      onChanged: (double value) => setState(() => _pad.volume = value / 100.0),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: Text('${(_pad.volume * 100).round()} %', textAlign: TextAlign.end),
+                  ),
+                ],
+              ),
+
+              // 6. Colours: palettes, custom colour in a dialog.
+              Text(S.padColor, style: label),
+              const SizedBox(height: 6),
+              _ColorRow(
+                colors: _palette,
+                selected: _pad.color,
+                onPick: (c) => setState(() => _pad.color = c),
+                onCustom: () => _customColor(text: false),
+              ),
+              gap,
+              Text(S.textColor, style: label),
+              const SizedBox(height: 6),
+              _ColorRow(
+                colors: _textPalette,
+                selected: _pad.textColor,
+                onPick: (c) => setState(() => _pad.textColor = c),
+                onCustom: () => _customColor(text: true),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
 //==============================================================================
 
-class _PaletteRow extends StatelessWidget {
+/// Colour swatches + a "custom colour" button. The current colour is ringed.
+class _ColorRow extends StatelessWidget {
   final List<Color> colors;
+  final Color selected;
   final ValueChanged<Color> onPick;
+  final VoidCallback onCustom;
 
-  const _PaletteRow({required this.colors, required this.onPick});
+  const _ColorRow({
+    required this.colors,
+    required this.selected,
+    required this.onPick,
+    required this.onCustom,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final ring = Theme.of(context).colorScheme.primary;
+    final bool isCustom = !colors.any((c) => c.toARGB32() == selected.toARGB32());
+    Widget dot(Color c, bool sel, {Widget? child, VoidCallback? onTap}) => InkWell(
+      customBorder: const CircleBorder(),
+      onTap: onTap,
+      child: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: c,
+          shape: BoxShape.circle,
+          border: Border.all(color: sel ? ring : Colors.black26, width: sel ? 3 : 1),
+        ),
+        child: child,
+      ),
+    );
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: colors
-          .map(
-            (c) => InkWell(
-              onTap: () => onPick(c),
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: c,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black26),
-                ),
-              ),
-            ),
-          )
-          .toList(),
+      spacing: 7,
+      runSpacing: 7,
+      children: [
+        for (final c in colors) dot(c, c.toARGB32() == selected.toARGB32(), onTap: () => onPick(c)),
+        dot(
+          isCustom ? selected : Colors.transparent,
+          isCustom,
+          onTap: onCustom,
+          child: Icon(Icons.palette_outlined, size: 18, color: isCustom ? null : Theme.of(context).hintColor),
+        ),
+      ],
     );
   }
 }
-
-//==============================================================================
 
 //==============================================================================
 

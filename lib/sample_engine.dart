@@ -271,7 +271,10 @@ class SampleEngine extends ChangeNotifier {
     return v;
   }
 
-  Future<Duration?> _probeDuration(String path) async {
+  Future<Duration?> _probeDuration(String path) => probeDuration(path);
+
+  /// Reads the length of an audio file with a temporary player (null if unknown).
+  static Future<Duration?> probeDuration(String path) async {
     final probe = AudioPlayer();
     try {
       await probe.setPlayerMode(PlayerMode.mediaPlayer);

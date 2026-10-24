@@ -6,7 +6,6 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
@@ -29,23 +28,29 @@ class ProjectArchive {
 
   //----------------------------------------------------------------------------
 
-  /// Builds the .zip bytes for [settings]. Missing sound files are skipped.
-  static Future<Uint8List> export(Settings settings) async {
-    final archive = Archive();
+  /// Writes the export of [settings] to the file [zipPath].
+  ///
+  /// Everything is streamed: each sound is copied from disk into the zip in
+  /// small chunks, so memory use does not depend on the size of the project
+  /// (a project of several GB exports fine). Missing sound files are skipped.
+  /// [onProgress] receives (sounds done, sounds total).
+  static Future<int> exportToFile(
+    Settings settings,
+    String zipPath, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final copy = Settings.copy(settings);
     final Map<String, String> entryForPath = {};
     final Set<String> usedNames = {};
 
-    final copy = Settings.copy(settings);
+    // 1. Decide the entry name of every sound (and drop missing files).
     for (final pad in copy.padSettings) {
       if (!pad.hasSample) continue;
-      final src = File(pad.sample);
-      if (!await src.exists()) {
-        pad.sample = "";
-        continue;
-      }
-
-      String? entry = entryForPath[pad.sample];
-      if (entry == null) {
+      if (!entryForPath.containsKey(pad.sample)) {
+        if (!await File(pad.sample).exists()) {
+          pad.sample = "";
+          continue;
+        }
         // Unique entry name, even if two different files share a name.
         String name = p.basename(pad.sample);
         int n = 2;
@@ -54,22 +59,43 @@ class ProjectArchive {
           n++;
         }
         usedNames.add(name);
-        entry = '$samplesDir$name';
-        entryForPath[pad.sample] = entry;
-
-        final bytes = await src.readAsBytes();
-        // Audio is already compressed: store it as is (much faster).
-        archive.addFile(ArchiveFile.noCompress(entry, bytes.length, bytes));
+        entryForPath[pad.sample] = '$samplesDir$name';
       }
-      pad.sample = entry;
+      pad.sample = entryForPath[pad.sample]!;
     }
 
-    final Map<String, dynamic> json = copy.toJson()
-      ..['format'] = 'opensampler-ig'
-      ..['formatVersion'] = formatVersion;
-    archive.addFile(ArchiveFile.string(projectEntry, const JsonEncoder.withIndent('  ').convert(json)));
+    // 2. Stream everything into the zip file, one sound at a time.
+    final out = File(zipPath);
+    await out.parent.create(recursive: true);
+    if (await out.exists()) await out.delete();
+    final output = OutputFileStream(zipPath);
+    final encoder = ZipEncoder();
+    try {
+      encoder.startEncode(output, level: 0);
 
-    return ZipEncoder().encodeBytes(archive);
+      final Map<String, dynamic> json = copy.toJson()
+        ..['format'] = 'opensampler-ig'
+        ..['formatVersion'] = formatVersion;
+      encoder.add(ArchiveFile.string(projectEntry, const JsonEncoder.withIndent('  ').convert(json)));
+
+      int done = 0;
+      final int total = entryForPath.length;
+      onProgress?.call(0, total);
+      for (final e in entryForPath.entries) {
+        final input = InputFileStream(e.key);
+        // Audio is already compressed: store it as is (fast, no extra memory).
+        final file = ArchiveFile.stream(e.value, input)..compression = CompressionType.none;
+        encoder.add(file, autoClose: true);
+        done++;
+        onProgress?.call(done, total);
+        // Let the UI breathe (progress dialog) between two sounds.
+        await Future<void>.delayed(Duration.zero);
+      }
+      encoder.endEncode();
+    } finally {
+      await output.close();
+    }
+    return entryForPath.length;
   }
 
   /// Suggested file name for the export.
@@ -80,46 +106,65 @@ class ProjectArchive {
 
   //----------------------------------------------------------------------------
 
-  /// Imports an exported project. Sounds go to the app's sample store and the
-  /// project is saved as a new project file (never overwriting an existing one).
-  /// Returns the project and the number of sounds imported.
-  static Future<(Settings, int)> import(Uint8List zipBytes) async {
-    final Archive archive;
+  /// Imports an exported project from the zip file at [zipPath]. Sounds are
+  /// extracted one by one straight to disk (no big memory use) into the app's
+  /// sample store, and the project is saved as a new project file (never
+  /// overwriting an existing one). Returns the project and the number of sounds.
+  static Future<(Settings, int)> importFromFile(
+    String zipPath, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final input = InputFileStream(zipPath);
     try {
-      archive = ZipDecoder().decodeBytes(zipBytes);
-    } catch (_) {
-      throw const FormatException('not a zip');
+      final Archive archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+      } catch (_) {
+        throw const FormatException('not a zip');
+      }
+
+      final projectFile = archive.findFile(projectEntry);
+      if (projectFile == null) throw const FormatException('no project');
+      final Map<String, dynamic> map = jsonDecode(utf8.decode(projectFile.content)) as Map<String, dynamic>;
+
+      final tmpDir = await Directory(p.join(documentDirectory.path, '.import_tmp')).create(recursive: true);
+      final sounds = archive.files.where((f) => f.isFile && f.name.startsWith(samplesDir)).toList();
+      final Map<String, String> storedFor = {};
+      int done = 0;
+      onProgress?.call(0, sounds.length);
+      try {
+        for (final f in sounds) {
+          final tmpPath = p.join(tmpDir.path, 'part_$done');
+          final out = OutputFileStream(tmpPath);
+          try {
+            f.writeContent(out);
+          } finally {
+            await out.close();
+          }
+          f.clear(); // free the decoder's buffer for this entry
+          storedFor[f.name] = await SampleStore.adopt(File(tmpPath), p.basename(f.name));
+          done++;
+          onProgress?.call(done, sounds.length);
+          await Future<void>.delayed(Duration.zero);
+        }
+      } finally {
+        if (await tmpDir.exists()) await tmpDir.delete(recursive: true);
+      }
+
+      // Then the project, pointing at the stored sounds.
+      final String baseName = ((map['name'] as String?) ?? 'Projet').trim();
+      final target = await _freeProjectFile(baseName);
+      final settings = Settings.fromJson(target, jsonEncode(map));
+      settings.name = p.basenameWithoutExtension(target.path);
+      for (final pad in settings.padSettings) {
+        if (!pad.hasSample) continue;
+        pad.sample = storedFor[pad.sample] ?? "";
+      }
+      await settings.save();
+      return (settings, storedFor.length);
+    } finally {
+      await input.close();
     }
-
-    final projectFile = archive.findFile(projectEntry);
-    if (projectFile == null) throw const FormatException('no project');
-
-    final Map<String, dynamic> map = jsonDecode(utf8.decode(projectFile.content)) as Map<String, dynamic>;
-
-    // Sounds first.
-    final Map<String, String> storedFor = {};
-    for (final f in archive.files) {
-      if (!f.isFile || !f.name.startsWith(samplesDir)) continue;
-      final bytes = f.content;
-      final stored = await SampleStore.import(
-        p.basename(f.name),
-        Stream<List<int>>.value(bytes),
-        length: bytes.length,
-      );
-      storedFor[f.name] = stored;
-    }
-
-    // Then the project, pointing at the stored sounds.
-    final String baseName = ((map['name'] as String?) ?? 'Projet').trim();
-    final target = await _freeProjectFile(baseName);
-    final settings = Settings.fromJson(target, jsonEncode(map));
-    settings.name = p.basenameWithoutExtension(target.path);
-    for (final pad in settings.padSettings) {
-      if (!pad.hasSample) continue;
-      pad.sample = storedFor[pad.sample] ?? "";
-    }
-    await settings.save();
-    return (settings, storedFor.length);
   }
 
   static Future<File> _freeProjectFile(String name) async {

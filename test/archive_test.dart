@@ -28,10 +28,11 @@ void main() {
       ..sample = '${src.path}/missing.mp3' // missing file -> pad emptied, export still works
       ..caption = 'Perdu';
 
-    final zip = await ProjectArchive.export(s);
+    final zip = '${src.path}/export.zip';
+    await ProjectArchive.exportToFile(s, zip);
     expect(ProjectArchive.fileNameFor(s), 'Match NM1.opensampler.zip');
 
-    final (imported, count) = await ProjectArchive.import(zip);
+    final (imported, count) = await ProjectArchive.importFromFile(zip);
     expect(count, 2);
     expect(imported.name, 'Match NM1');
     expect(imported.padSettings[0].caption, 'Intro');
@@ -44,16 +45,14 @@ void main() {
     expect(imported.file.existsSync(), true);
 
     // Importing again never overwrites: new project name.
-    final (again, _) = await ProjectArchive.import(zip);
+    final (again, _) = await ProjectArchive.importFromFile(zip);
     expect(again.name, 'Match NM1 (2)');
   });
 
-  test('rejects a random zip / random file', () async {
+  test('rejects a random file / a zip without project', () async {
     documentDirectory = Directory.systemTemp.createTempSync('os_arch2');
-    expect(() => ProjectArchive.import(Uint8ListHelper.junk()), throwsA(isA<FormatException>()));
+    await expectLater(ProjectArchive.importFromFile('/etc/hostname'), throwsA(isA<FormatException>()));
+    final noProject = File('${documentDirectory.path}/x.zip')..writeAsBytesSync([80, 75, 5, 6, ...List.filled(18, 0)]);
+    await expectLater(ProjectArchive.importFromFile(noProject.path), throwsA(isA<FormatException>()));
   });
-}
-
-class Uint8ListHelper {
-  static dynamic junk() => File('/etc/hostname').readAsBytesSync();
 }

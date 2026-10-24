@@ -10,11 +10,13 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   projet (.zip), échanger/déplacer/dupliquer un pad, interface FR/EN, nouvelle icône
   (source : assets/icon/logo_circle.png). Volume général écarté par Ivan.
 - v2.2.0 (livrée) : pages/onglets par projet, STOP réduit (25 % de largeur, à droite).
+- v2.3.0 (livrée) : export/import en flux (gros projets, fin des OOM), import de sons en masse,
+  réglages d'un pad compactés sur un seul écran.
 - Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
   - v2.3 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
     dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,
     verrouillage de l'orientation.
-  - v2.4 proposée : import de plusieurs sons d'un coup (remplit les pads vides), pad « playlist »
+  - v2.4 proposée : pad « playlist »
     (morceau suivant / aléatoire à chaque appui), baisse auto de la musique (ducking) pour pads prioritaires.
   - Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
     télécommande/pédale Bluetooth.
@@ -32,6 +34,12 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - Incrémenter `version:` dans pubspec.yaml (versionCode) à chaque release.
 
 ## Points techniques
+- Export/import : JAMAIS de lecture complète en mémoire (ZipEncoder.add + InputFileStream,
+  ZipDecoder.decodeStream + writeContent). Enregistrement/partage via le canal natif
+  `opensampler/files` (MainActivity.kt, copie disque→disque) + FileProvider (cache/exports).
+  test/archive_memory_test.dart vérifie que la mémoire reste bornée.
+- Publication : la session ne peut ni créer de Release GitHub ni pousser de tag (403) ;
+  Ivan publie lui-même la Release (notes + APK + SHA256SUMS.txt préparés dans son dossier).
 - Pages : `Settings.padSettings` est une liste plate (page après page, x*y pads chacune),
   `pageNames` donne les pages. Les index de pads sont globaux ; `SampleEngine.applyLayout`
   déplace les lecteurs avec leurs pads (ajout/suppression/déplacement de page sans couper le son).

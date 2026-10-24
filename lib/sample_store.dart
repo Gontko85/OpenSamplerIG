@@ -55,6 +55,33 @@ class SampleStore {
     return target;
   }
 
+  /// Moves an already-written file (e.g. extracted from an import) into the
+  /// samples folder under [name], reusing an identical copy when there is one.
+  static Future<String> adopt(File file, String name) async {
+    final dir = directory;
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    final String base = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    String target = p.join(dir.path, base);
+    final existing = File(target);
+    if (await existing.exists()) {
+      if (await existing.length() == await file.length()) {
+        await file.delete();
+        return target;
+      }
+      final String stamp = DateTime.now().millisecondsSinceEpoch.toString();
+      target = p.join(dir.path, '${p.basenameWithoutExtension(base)}_$stamp${p.extension(base)}');
+    }
+    try {
+      await file.rename(target);
+    } on FileSystemException {
+      await file.copy(target);
+      await file.delete();
+    }
+    return target;
+  }
+
   static Future<bool> exists(String path) async => path.isNotEmpty && await File(path).exists();
 }
 

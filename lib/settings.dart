@@ -245,6 +245,12 @@ class Settings {
     padSettings.insertAll(target * padsPerPage, pads);
   }
 
+  /// Indexes of the empty pads (no sound) from [page] to the last page, in order.
+  List<int> emptySlotsFrom(int page) => [
+    for (int i = page * padsPerPage; i < padSettings.length; i++)
+      if (!padSettings[i].hasSample) i,
+  ];
+
   /// Display name of a page ("Page 2" when not named).
   String pageLabel(int page, String Function(int) fallback) =>
       pageNames[page].trim().isEmpty ? fallback(page + 1) : pageNames[page];

@@ -12,6 +12,8 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - v2.2.0 (livrée) : pages/onglets par projet, STOP réduit (25 % de largeur, à droite).
 - v2.3.0 (livrée) : export/import en flux (gros projets, fin des OOM), import de sons en masse,
   réglages d'un pad compactés sur un seul écran.
+- v2.3.1 (livrée) : réparation auto des « faux MP3 » (MPEG-PS contenant du MP3, cause de la
+  pastille rouge chez Ivan), retry en son long, raison de l'erreur affichée.
 - Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
   - v2.4 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
     dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,
@@ -34,6 +36,10 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - Incrémenter `version:` dans pubspec.yaml (versionCode) à chaque release.
 
 ## Points techniques
+- Faux MP3 : fichiers .mp3 = MPEG Program Stream (00 00 01 BA, tailles multiples de 2048).
+  `AudioRepair` extrait les PES audio (0xC0–0xDF) en flux, sans réencodage ; appelé dans
+  SampleStore.import/adopt et au chargement d'un pad. Fixtures synthétiques dans test/fixtures
+  (ne JAMAIS committer les musiques d'Ivan : droits d'auteur, dépôt public).
 - Export/import : JAMAIS de lecture complète en mémoire (ZipEncoder.add + InputFileStream,
   ZipDecoder.decodeStream + writeContent). Enregistrement/partage via le canal natif
   `opensampler/files` (MainActivity.kt, copie disque→disque) + FileProvider (cache/exports).

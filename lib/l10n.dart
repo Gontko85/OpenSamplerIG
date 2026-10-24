@@ -150,6 +150,19 @@ class Strings {
   String openConfirm(String n) => _t('Ouvrir le projet « $n » ?', 'Do you want to open project $n?');
   String deleteConfirm(String n) => _t('Supprimer le projet « $n » ?', 'Do you want to delete project $n?');
 
+  // Pads that cannot play (red badge)
+  String get padProblemMissing => _t(
+    'le fichier de ce son n\'est plus dans l\'appli. Rechoisissez-le dans les réglages de la touche.',
+    'this sound file is no longer in the app. Pick it again in the pad settings.',
+  );
+  String padProblemRefused(String detail) => _t(
+    'Android refuse de lire ce fichier (format non pris en charge ou fichier abîmé). '
+        'Convertissez-le en MP3 standard puis rechoisissez-le. Détail technique : $detail',
+    'Android cannot play this file (unsupported format or damaged file). '
+        'Convert it to a standard MP3 and pick it again. Technical detail: $detail',
+  );
+  String get padProblemFix => _t('Régler', 'Fix');
+
   // Pad settings
   String padTitle(int row, int col) => _t('Pad ligne $row, colonne $col', 'Pad row $row, column $col');
   String padTitleOnPage(String page, int row, int col) =>
@@ -262,6 +275,11 @@ class Strings {
             '',
             'Le fichier choisi est copié dans l\'application : il continue de fonctionner même si l\'original est déplacé ou si le cache du téléphone est vidé.',
           ),
+          ('Pastille rouge', null),
+          (
+            '',
+            'Une pastille rouge sur une touche signale un son illisible : touchez-la pour en voir la raison. Les « faux MP3 » (fichiers vidéo .mpg renommés en .mp3, souvent issus de logiciels de montage) sont réparés automatiquement, sans perte de qualité, à l\'import comme au chargement.',
+          ),
           ('Son long', null),
           (
             '',
@@ -328,6 +346,11 @@ class Strings {
           (
             '',
             'The chosen file is copied inside the app, so it keeps working even if the original file is moved or the phone cache is cleared.',
+          ),
+          ('Red badge', null),
+          (
+            '',
+            'A red badge on a pad means its sound cannot be played: tap it to see why. "Fake MP3" files (.mpg video files renamed .mp3, often made by video editors) are repaired automatically, losslessly, on import and on load.',
           ),
           ('Long sound', null),
           (

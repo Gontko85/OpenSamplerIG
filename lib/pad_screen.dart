@@ -121,7 +121,35 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
 
   //----------------------------------------------------------------------------
 
-  void _press(int idx) => _engine.press(idx);
+  void _press(int idx) {
+    final v = _engine.voice(idx);
+    if (v != null && v.missing) {
+      _showPadProblem(idx);
+      return;
+    }
+    _engine.press(idx);
+  }
+
+  /// Plain-language reason for a pad with a red badge.
+  String? _problemOf(int idx) {
+    final v = _engine.voice(idx);
+    if (v == null || !v.missing) return null;
+    return v.fileMissing ? S.padProblemMissing : S.padProblemRefused(v.error ?? '?');
+  }
+
+  void _showPadProblem(int idx) {
+    final msg = _problemOf(idx);
+    if (msg == null) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text('${_settings.padSettings[idx].caption} : $msg'),
+          action: _stageLock ? null : SnackBarAction(label: S.padProblemFix, onPressed: () => _editPad(idx)),
+        ),
+      );
+  }
 
   int get _page => _settings.currentPage.clamp(0, _settings.pageCount - 1);
 
@@ -133,7 +161,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
 
     final int? otherPad = await Navigator.push<int>(
       context,
-      MaterialPageRoute(builder: (context) => PadSettingsScreen(col, row, padIdx, _settings)),
+      MaterialPageRoute(
+        builder: (context) => PadSettingsScreen(col, row, padIdx, _settings, problem: _problemOf(padIdx)),
+      ),
     );
 
     // The pad was swapped with / copied to another pad: reload both.

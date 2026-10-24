@@ -83,7 +83,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
-        home: PadSettingsScreen(0, 0, 0, s),
+        home: PadSettingsScreen(0, 0, 0, s, problem: S.padProblemRefused('MEDIA_ERROR_UNKNOWN {what:1} — MEDIA_ERROR_UNSUPPORTED')),
       ));
       await tester.pump();
       // No scrolling needed: the scroll view has nothing to scroll.

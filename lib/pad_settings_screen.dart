@@ -23,9 +23,12 @@ class PadSettingsScreen extends StatefulWidget {
   final int index;
   final Settings project;
 
+  /// Why this pad cannot play (red badge), if it cannot.
+  final String? problem;
+
   /// Pops with the index of another pad when this pad was swapped with or
   /// copied to it, so the caller can reload both.
-  const PadSettingsScreen(this.col, this.row, this.index, this.project, {super.key});
+  const PadSettingsScreen(this.col, this.row, this.index, this.project, {this.problem, super.key});
 
   @override
   State<PadSettingsScreen> createState() => _PadSettingsScreenState();
@@ -35,6 +38,7 @@ class PadSettingsScreen extends StatefulWidget {
 
 class _PadSettingsScreenState extends State<PadSettingsScreen> {
   bool _importing = false;
+  late String? _problem = widget.problem; // cleared once another sound is chosen
   late final TextEditingController _caption = TextEditingController(text: _pad.caption);
 
   PadSettings get _pad => widget.project.padSettings[widget.index];
@@ -77,6 +81,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
       final bool autoCaption = _captionIsAutomatic(oldSample);
       _pad.sample = stored;
       _pad.durationMs = 0;
+      _problem = null;
       if (autoCaption) {
         _pad.caption = p.basenameWithoutExtension(picked.name);
         _caption.text = _pad.caption;
@@ -97,6 +102,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     // Remove the sound AND its name: the pad goes back to a blank pad (shows its number).
     _pad.sample = "";
     _pad.durationMs = 0;
+    _problem = null;
     _pad.caption = "${widget.project.indexInPage(widget.index) + 1}";
     _caption.text = _pad.caption;
     await widget.project.save();
@@ -255,6 +261,27 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                 ),
               ),
               gap,
+
+              if (_problem != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.error, color: theme.colorScheme.error),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(_problem!, style: TextStyle(color: theme.colorScheme.onErrorContainer)),
+                      ),
+                    ],
+                  ),
+                ),
+                gap,
+              ],
 
               // 2. Sound file.
               Row(

@@ -10,6 +10,9 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
+import 'audio_repair.dart';
 
 import 'settings.dart';
 
@@ -29,7 +32,15 @@ class PadVoice {
   final PadSettings settings;
   AudioPlayer? player;
   Duration? duration;
+
+  /// True when the pad cannot play (red badge): see [fileMissing] / [error].
   bool missing = false;
+
+  /// The sound file is not on the device any more.
+  bool fileMissing = false;
+
+  /// Why Android refused the file (raw player message), when it did.
+  String? error;
 
   VoiceState state = VoiceState.idle;
 
@@ -221,54 +232,93 @@ class SampleEngine extends ChangeNotifier {
 
     if (!await File(pad.sample).exists()) {
       v.missing = true;
+      v.fileMissing = true;
       return v;
     }
 
-    try {
-      // Unique id: pads can move between indexes (page moves), ids must never collide.
-      final player = AudioPlayer(playerId: 'pad_${_nextPlayerId++}');
-      v.player = player;
-      await player.setPlayerMode(pad.long ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
-      await player.setReleaseMode(pad.looped ? ReleaseMode.loop : ReleaseMode.stop);
-      await player.setVolume(pad.volume);
-      await player.setSource(DeviceFileSource(pad.sample));
-
-      // Duration: cached, or read from the player, or probed with a temporary player.
-      if (pad.durationMs > 0) {
-        v.duration = Duration(milliseconds: pad.durationMs);
-      } else {
-        Duration? d;
-        if (pad.long) {
-          d = await player.getDuration();
-        } else {
-          d = await _probeDuration(pad.sample);
-        }
-        if (d != null && d > Duration.zero) {
-          v.duration = d;
-          pad.durationMs = d.inMilliseconds;
-          settingsDirty = true;
-        }
-      }
-
-      if (pad.long) {
-        v._subs.add(player.onPlayerComplete.listen((_) => _onComplete(v)));
-        v._subs.add(
-          player.onPositionChanged.listen((pos) {
-            if (v.state == VoiceState.playing || v.state == VoiceState.fading) {
-              if (DateTime.now().isAfter(v._ignorePositionUntil)) {
-                v._clockRestart(pos);
-              }
-            }
-          }),
-        );
-      }
-    } catch (e) {
-      debugPrint('Pad $i: cannot load ${pad.sample}: $e');
-      await v.dispose();
-      v.missing = true;
+    // "Fake MP3" (.mpg container) imported by an older version: fix it once,
+    // losslessly, then it plays like any other file.
+    if (await AudioRepair.repairIfNeeded(pad.sample)) {
+      pad.durationMs = 0;
+      settingsDirty = true;
     }
 
+    Object? firstError;
+    try {
+      await _loadPlayer(i, v, pad);
+      return v;
+    } catch (e) {
+      firstError = e;
+      await v.dispose();
+    }
+
+    // A long sound set as "short" (low latency mode) may be refused: retry it
+    // as a long sound before giving up.
+    if (!pad.long) {
+      try {
+        pad.long = true;
+        await _loadPlayer(i, v, pad);
+        pad.durationMs = 0;
+        settingsDirty = true;
+        return v;
+      } catch (_) {
+        pad.long = false;
+        await v.dispose();
+      }
+    }
+
+    debugPrint('Pad $i: cannot load ${pad.sample}: $firstError');
+    v.missing = true;
+    v.error = _describe(firstError);
     return v;
+  }
+
+  static String _describe(Object? e) {
+    if (e is PlatformException) {
+      return [e.message, e.details?.toString()].whereType<String>().where((s) => s.isNotEmpty).join(' — ');
+    }
+    if (e is TimeoutException) return 'timeout';
+    return e.toString();
+  }
+
+  Future<void> _loadPlayer(int i, PadVoice v, PadSettings pad) async {
+    // Unique id: pads can move between indexes (page moves), ids must never collide.
+    final player = AudioPlayer(playerId: 'pad_${_nextPlayerId++}');
+    v.player = player;
+    await player.setPlayerMode(pad.long ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
+    await player.setReleaseMode(pad.looped ? ReleaseMode.loop : ReleaseMode.stop);
+    await player.setVolume(pad.volume);
+    await player.setSource(DeviceFileSource(pad.sample));
+
+    // Duration: cached, or read from the player, or probed with a temporary player.
+    if (pad.durationMs > 0) {
+      v.duration = Duration(milliseconds: pad.durationMs);
+    } else {
+      Duration? d;
+      if (pad.long) {
+        d = await player.getDuration();
+      } else {
+        d = await _probeDuration(pad.sample);
+      }
+      if (d != null && d > Duration.zero) {
+        v.duration = d;
+        pad.durationMs = d.inMilliseconds;
+        settingsDirty = true;
+      }
+    }
+
+    if (pad.long) {
+      v._subs.add(player.onPlayerComplete.listen((_) => _onComplete(v)));
+      v._subs.add(
+        player.onPositionChanged.listen((pos) {
+          if (v.state == VoiceState.playing || v.state == VoiceState.fading) {
+            if (DateTime.now().isAfter(v._ignorePositionUntil)) {
+              v._clockRestart(pos);
+            }
+          }
+        }),
+      );
+    }
   }
 
   Future<Duration?> _probeDuration(String path) => probeDuration(path);

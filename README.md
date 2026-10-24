@@ -4,6 +4,15 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.3.1
+
+- **Réparation automatique des « faux MP3 »** : des fichiers .mp3 qui sont en réalité des vidéos MPEG
+  (.mpg, souvent produits par des logiciels de montage) étaient refusés par Android (pastille rouge).
+  L'appli en extrait maintenant la musique, sans réencodage ni perte, à l'import et au chargement
+  des touches existantes.
+- Un son court refusé en mode « faible latence » est automatiquement réessayé en « son long ».
+- **Pastille rouge expliquée** : toucher la touche affiche la raison (fichier absent, format refusé + détail).
+
 ## Nouveautés de la v2.3.0
 
 - **Export / import des gros projets** : le .zip est écrit et relu *en flux*, son par son, sans
@@ -85,6 +94,7 @@ ne doivent jamais être poussés sur le dépôt.
 | `lib/settings_screen.dart` | Réglages du projet et globaux |
 | `lib/project_archive.dart` | Export / import d'un projet (.zip) |
 | `lib/l10n.dart` | Textes de l'interface FR / EN |
+| `lib/audio_repair.dart` | Réparation sans perte des « faux MP3 » (MPEG-PS) |
 | `lib/native_files.dart` + `MainActivity.kt` | Enregistrer / partager un gros fichier sans le charger en mémoire |
 
 ## Licence

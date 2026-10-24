@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'audio_repair.dart';
 import 'main.dart';
 
 //==============================================================================
@@ -52,6 +53,7 @@ class SampleStore {
       await sink.close();
     }
     await tmp.rename(target);
+    await AudioRepair.repairIfNeeded(target); // "fake MP3" (.mpg) -> real MP3
     return target;
   }
 
@@ -79,6 +81,7 @@ class SampleStore {
       await file.copy(target);
       await file.delete();
     }
+    await AudioRepair.repairIfNeeded(target); // "fake MP3" (.mpg) -> real MP3
     return target;
   }
 

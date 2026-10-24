@@ -13,10 +13,10 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - v2.3.0 (livrée) : export/import en flux (gros projets, fin des OOM), import de sons en masse,
   réglages d'un pad compactés sur un seul écran.
 - Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
-  - v2.3 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
+  - v2.4 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
     dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,
     verrouillage de l'orientation.
-  - v2.4 proposée : pad « playlist »
+  - v2.5 proposée : pad « playlist »
     (morceau suivant / aléatoire à chaque appui), baisse auto de la musique (ducking) pour pads prioritaires.
   - Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
     télécommande/pédale Bluetooth.

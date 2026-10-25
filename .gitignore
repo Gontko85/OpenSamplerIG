@@ -49,3 +49,4 @@ app.*.map.json
 
 # Gradle reports
 android/build/
+test/failures/

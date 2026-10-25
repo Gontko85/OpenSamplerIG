@@ -42,6 +42,9 @@ class PadVoice {
   /// Why Android refused the file (raw player message), when it did.
   String? error;
 
+  /// When the sound was last started (orders the "Now playing" strip).
+  DateTime startedAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   VoiceState state = VoiceState.idle;
 
   final Stopwatch _clock = Stopwatch();
@@ -380,6 +383,50 @@ class SampleEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Test helper: replaces the voices (and recent list) without any audio.
+  @visibleForTesting
+  void debugSetVoices(List<PadVoice?> voices, {List<PadSettings> recentPads = const []}) {
+    _generation++;
+    _voices = voices;
+    recent
+      ..clear()
+      ..addAll(recentPads);
+    notifyListeners();
+  }
+
+  /// Pads started most recently first (by identity, so page moves don't matter).
+  final List<PadSettings> recent = [];
+  static const int maxRecent = 8;
+
+  void _remember(PadVoice v) {
+    v.startedAt = DateTime.now();
+    recent.removeWhere((p) => identical(p, v.settings));
+    recent.insert(0, v.settings);
+    if (recent.length > maxRecent) recent.removeRange(maxRecent, recent.length);
+  }
+
+  /// Indexes of the pads playing, fading or paused, most recently started first.
+  List<int> activeIndices() {
+    final list = <int>[
+      for (int i = 0; i < _voices.length; i++)
+        if (_voices[i] != null && _voices[i]!.state != VoiceState.idle) i,
+    ];
+    list.sort((a, b) => _voices[b]!.startedAt.compareTo(_voices[a]!.startedAt));
+    return list;
+  }
+
+  /// Stops one pad: fade out (if set), or at once when paused / already fading.
+  Future<void> stopPad(int i) async {
+    final v = voice(i);
+    if (v == null || v.state == VoiceState.idle) return;
+    if (fadeMs <= 0 || v.state == VoiceState.paused || v.state == VoiceState.fading) {
+      await _hardStop(v);
+    } else {
+      _fadeOut(v);
+    }
+    notifyListeners();
+  }
+
   /// Stops every pad. Fades out first; a second call during the fade cuts at once.
   Future<void> stopAll() async {
     final bool immediate = fadeMs <= 0 || anyFading;
@@ -433,6 +480,7 @@ class SampleEngine extends ChangeNotifier {
   }
 
   Future<void> _start(PadVoice v) async {
+    _remember(v);
     await _stopGroupMates(v);
     final p = v.player!;
     await p.setVolume(v.settings.volume);
@@ -448,6 +496,7 @@ class SampleEngine extends ChangeNotifier {
   }
 
   Future<void> _restart(PadVoice v) async {
+    _remember(v);
     await _stopGroupMates(v);
     final p = v.player!;
     v._ignorePositionUntil = DateTime.now().add(const Duration(milliseconds: 300));

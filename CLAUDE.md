@@ -15,12 +15,16 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - v2.3.1 (livrée) : réparation auto des « faux MP3 » (MPEG-PS contenant du MP3, cause de la
   pastille rouge chez Ivan), retry en son long, raison de l'erreur affichée.
 - v2.3.2 (livrée) : recherche de son (loupe, cadre bleu #2979FF, ▲▼), PadTile clé = PadSettings.
+- v2.4.0 (livrée) : bandeau « En cours » (stop par son), sons récents (8, par identité de
+  PadSettings), texte auto-ajusté (AutoFitText, plafond 34, ponctuation insécable), nettoyage du stockage.
 - Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
-  - v2.4 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
+  - v2.5 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
     dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,
     verrouillage de l'orientation.
-  - v2.5 proposée : pad « playlist »
+  - v2.6 proposée : pad « playlist »
     (morceau suivant / aléatoire à chaque appui), baisse auto de la musique (ducking) pour pads prioritaires.
+  - Idée gardée en réserve : « conducteur » de match (déroulé de sons + bouton Suivant),
+    copier une touche vers un autre projet.
   - Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
     télécommande/pédale Bluetooth.
 
@@ -37,6 +41,8 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - Incrémenter `version:` dans pubspec.yaml (versionCode) à chaque release.
 
 ## Points techniques
+- Tests d'écran : PadScreen(settings, engine: ...) + SampleEngine.debugSetVoices pour simuler des
+  sons en lecture ; state.debugSettings donne la copie du projet utilisée par l'écran.
 - Faux MP3 : fichiers .mp3 = MPEG Program Stream (00 00 01 BA, tailles multiples de 2048).
   `AudioRepair` extrait les PES audio (0xC0–0xDF) en flux, sans réencodage ; appelé dans
   SampleStore.import/adopt et au chargement d'un pad. Fixtures synthétiques dans test/fixtures

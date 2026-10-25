@@ -6,6 +6,10 @@
 //==============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'dialogs.dart';
+import 'storage_cleaner.dart';
 
 import 'settings.dart';
 import 'l10n.dart';
@@ -101,6 +105,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: GlobalPrefs.keepScreenOn,
             onChanged: (v) => setState(() => GlobalPrefs.keepScreenOn = v),
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(S.showNowPlaying),
+            value: GlobalPrefs.showNowPlaying,
+            onChanged: (v) => setState(() => GlobalPrefs.showNowPlaying = v),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(S.showRecent),
+            value: GlobalPrefs.showRecent,
+            onChanged: (v) => setState(() => GlobalPrefs.showRecent = v),
+          ),
+          const SizedBox(height: 28),
+          Text(S.storage, style: header),
+          const SizedBox(height: 8),
+          _StoragePanel(current: _s),
         ],
       ),
     );
@@ -108,3 +128,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 //==============================================================================
+
+/// Space used by the sounds, and a button to delete those no project uses.
+class _StoragePanel extends StatefulWidget {
+  final Settings current;
+  const _StoragePanel({required this.current});
+
+  @override
+  State<_StoragePanel> createState() => _StoragePanelState();
+}
+
+class _StoragePanelState extends State<_StoragePanel> {
+  late Future<StorageReport> _report = _analyze();
+  bool _cleaning = false;
+
+  Future<StorageReport> _analyze() async {
+    await widget.current.save(); // the project on screen counts as "used"
+    return StorageCleaner.analyze(current: widget.current, cacheDir: await getTemporaryDirectory());
+  }
+
+  String _b(int bytes) => StorageCleaner.formatBytes(bytes, fr: S.fr);
+
+  Future<void> _clean(StorageReport r) async {
+    final ok = await confirm(
+      context,
+      title: Text(S.storageCleanTitle),
+      content: Text(S.storageCleanConfirm(r.unused.length, _b(r.freeableBytes))),
+    );
+    if (!ok || !mounted) return;
+    setState(() => _cleaning = true);
+    final freed = await StorageCleaner.clean(r);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(S.storageFreed(_b(freed)))));
+    setState(() {
+      _cleaning = false;
+      _report = _analyze();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<StorageReport>(
+      future: _report,
+      builder: (context, snap) {
+        if (!snap.hasData || _cleaning) {
+          return const Padding(padding: EdgeInsets.all(8), child: LinearProgressIndicator());
+        }
+        final r = snap.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(S.storageSounds(r.soundCount, _b(r.soundBytes))),
+            const SizedBox(height: 4),
+            Text(
+              r.freeableBytes > 0 ? S.storageUnused(r.unused.length, _b(r.freeableBytes)) : S.storageNothing,
+              style: TextStyle(color: Theme.of(context).hintColor),
+            ),
+            if (!r.safe) ...[
+              const SizedBox(height: 4),
+              Text(
+                S.storageUnsafe(r.unreadableProjects.join(', ')),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 10),
+            FilledButton.tonalIcon(
+              onPressed: r.safe && r.freeableBytes > 0 ? () => _clean(r) : null,
+              icon: const Icon(Icons.cleaning_services_outlined),
+              label: Text(S.storageCleanButton(_b(r.freeableBytes))),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}

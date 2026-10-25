@@ -8,6 +8,7 @@ import 'package:opensampler/main.dart';
 import 'package:opensampler/pad_screen.dart';
 import 'package:opensampler/pad_settings_screen.dart';
 import 'package:opensampler/pad_tile.dart';
+import 'package:opensampler/sample_engine.dart';
 import 'package:opensampler/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -139,6 +140,55 @@ void main() {
     expect(find.text('1/1'), findsOneWidget);
     expect(cur().settings.caption, 'Hymne LSVB');
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/search_fr.png'));
+  });
+
+  testWidgets('now playing strip and recent sounds', (tester) async {
+    setLanguage('fr');
+    await tester.runAsync(_loadFonts);
+    tester.view.physicalSize = const Size(1080, 2000);
+    tester.view.devicePixelRatio = 2.75;
+    final s = _demo(); // pages Match, Mi-temps, Animations; captions on page Match
+    s.padsOfPage(2)[0]
+      ..caption = 'Chorégraphie Cheers 1'
+      ..color = const Color(0xFFD81B60)
+      ..textColor = Colors.white;
+    final engine = SampleEngine();
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+      home: PadScreen(s, engine: engine),
+    ));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // The screen works on its own copy of the project: use its pads.
+    final pads = tester.widgetList<PadTile>(find.byType(PadTile)).map((t) => t.settings).toList();
+    final shown = pads.first; // "Entrée joueurs"
+    final voices = List<PadVoice?>.filled(3 * 12, null);
+    PadVoice v(PadSettings p, VoiceState st, int pos, int tot, int ago) =>
+        PadVoice(0, p)
+          ..debugSet(st, Duration(seconds: pos), Duration(seconds: tot))
+          ..startedAt = DateTime.now().subtract(Duration(seconds: ago));
+    voices[0] = v(shown, VoiceState.playing, 47, 128, 50);
+    voices[4] = v(pads[4], VoiceState.paused, 64, 100, 80);
+    // A pad of page Animations (index 24), not on screen.
+    final state = tester.state(find.byType(PadScreen));
+    final copy = (state as dynamic).debugSettings as Settings;
+    voices[24] = v(copy.padSettings[24], VoiceState.playing, 12, 95, 5);
+    for (int i = 0; i < 6; i++) {
+      copy.padSettings[i].sample = '/sons/$i.mp3'; // real pads: captions auto-fit
+    }
+    engine.debugSetVoices(voices, recentPads: [copy.padSettings[24], pads[2], shown, pads[1]]);
+    await tester.pump();
+
+    expect(find.text('Chorégraphie Cheers 1'), findsNWidgets(2), reason: 'in "now playing" and in recents');
+    expect(find.text('-1:23'), findsWidgets);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/now_playing_fr.png'));
+
+    // Tapping it in the strip shows its page.
+    await tester.tap(find.text('Chorégraphie Cheers 1').first);
+    await tester.pump();
+    expect(tester.widgetList<PadTile>(find.byType(PadTile)).any((t) => t.highlight == 2), true);
+    await tester.pump(const Duration(seconds: 2));
   });
 }
 

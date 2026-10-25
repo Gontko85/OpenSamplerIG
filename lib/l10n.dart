@@ -91,6 +91,38 @@ class Strings {
     'The grid applies to every page of the project.',
   );
 
+  // Now playing / recent
+  String get nowPlaying => _t('En cours', 'Now playing');
+  String get recentSounds => _t('Sons récents', 'Recent sounds');
+  String get stopThis => _t('Arrêter ce son', 'Stop this sound');
+  String get paused => _t('pause', 'paused');
+  String get showNowPlaying => _t('Bandeau « En cours » (sons qui jouent)', '"Now playing" strip');
+  String get showRecent => _t('Rangée des sons récents', 'Recent sounds row');
+
+  // Storage
+  String get storage => _t('Stockage', 'Storage');
+  String storageSounds(int n, String size) => _t(
+    'Sons gardés par l\'appli : $n fichier${n > 1 ? 's' : ''}, $size',
+    'Sounds kept by the app: $n file${n > 1 ? 's' : ''}, $size',
+  );
+  String storageUnused(int n, String size) => _t(
+    '$size récupérable${n > 0 ? ' ($n son${n > 1 ? 's' : ''} utilisé${n > 1 ? 's' : ''} dans aucun projet)' : ''}',
+    '$size can be freed${n > 0 ? ' ($n sound${n > 1 ? 's' : ''} used by no project)' : ''}',
+  );
+  String get storageNothing =>
+      _t('Rien à nettoyer : tous les sons servent.', 'Nothing to clean: every sound is in use.');
+  String storageUnsafe(String names) => _t(
+    'Nettoyage impossible : projet illisible ($names). Aucun son ne sera supprimé.',
+    'Cleaning disabled: unreadable project ($names). No sound will be deleted.',
+  );
+  String storageCleanButton(String size) => _t('Nettoyer ($size)', 'Clean up ($size)');
+  String get storageCleanTitle => _t('Nettoyer le stockage ?', 'Clean up storage?');
+  String storageCleanConfirm(int n, String size) => _t(
+    '$n son${n > 1 ? 's' : ''} qui ne ${n > 1 ? 'servent' : 'sert'} dans aucun projet enregistré, et les fichiers temporaires, seront supprimés ($size). Les fichiers d\'origine sur la tablette ne sont pas touchés.',
+    '$n sound${n > 1 ? 's' : ''} used by no saved project, and temporary files, will be deleted ($size). Your original files on the device are not touched.',
+  );
+  String storageFreed(String size) => _t('$size libérés', '$size freed');
+
   // Search
   String get search => _t('Rechercher un son', 'Search a sound');
   String get searchHint => _t('Nom de la touche…', 'Pad name…');
@@ -227,7 +259,7 @@ class Strings {
   String get horizontalPads => _t('Pads en largeur', 'Horizontal Pads');
   String get verticalPads => _t('Pads en hauteur', 'Vertical Pads');
   String get fontSize => _t('Taille du texte', 'Font Size');
-  String get fontDefault => _t('Par défaut', 'Default');
+  String get fontDefault => _t('Automatique (ajustée à la touche)', 'Automatic (fits the pad)');
   String get fadeOut => _t('Fondu à l\'arrêt', 'Fade out when stopping');
   String get fadeOff => _t('Non (coupure nette)', 'Off (cut)');
   String get showRemaining => _t('Afficher le temps restant sur les pads', 'Show remaining time on pads');
@@ -327,6 +359,16 @@ class Strings {
             '',
             'Menu ⋮ > Importer plusieurs sons : sélectionnez autant de fichiers que vous voulez. Ils remplissent, par ordre alphabétique, les touches vides de la page affichée puis des pages suivantes (l\'appli propose d\'ajouter des pages s\'il en manque). Le nom de la touche reprend celui du fichier et l\'option « son long » est réglée selon la durée.',
           ),
+          ('Sons en cours et sons récents', null),
+          (
+            '',
+            'En bas de l\'écran, le bandeau « En cours » liste les sons qui jouent, quelle que soit leur page : temps restant, bouton pour arrêter ce son seul, et un appui sur son nom montre la touche. La rangée « récents » rappelle les derniers sons lancés : un appui les relance. Les deux se masquent dans les Réglages.',
+          ),
+          ('Stockage', null),
+          (
+            '',
+            'Réglages > Stockage indique la place prise par les sons et supprime ceux qui ne servent plus dans aucun projet enregistré (sons remplacés, retirés…). Pensez à enregistrer vos projets avant : un son n\'est considéré comme utilisé que s\'il figure dans un projet enregistré.',
+          ),
           ('Exporter / importer', null),
           (
             '',
@@ -403,6 +445,16 @@ class Strings {
           (
             '',
             'Menu ⋮ > Import several sounds: pick as many files as you like. They fill, in alphabetical order, the empty pads of the current page then of the following pages (the app offers to add pages if needed). Pad names come from the file names and "long sound" is set from the length.',
+          ),
+          ('Now playing and recent sounds', null),
+          (
+            '',
+            'At the bottom, the "Now playing" strip lists the sounds playing on any page: remaining time, a button to stop that sound only, and tapping its name shows the pad. The "recent" row recalls the last sounds started: tap to play again. Both can be hidden in Settings.',
+          ),
+          ('Storage', null),
+          (
+            '',
+            'Settings > Storage shows the space used by sounds and deletes the ones no saved project uses any more (replaced, removed…). Save your projects first: a sound only counts as used when it is in a saved project.',
           ),
           ('Export / import', null),
           (

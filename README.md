@@ -4,6 +4,16 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.4.0
+
+- **Bandeau « En cours »** en bas : tous les sons qui jouent (toutes pages), temps restant, arrêt d'un
+  son précis, et un appui sur son nom montre la touche.
+- **Sons récents** : rangée des 8 derniers sons lancés, relance en un geste.
+- **Texte des touches ajusté automatiquement** à la taille de chaque touche (réglage « Taille du texte »
+  sur « Automatique »), sans couper « Panier ! » avant le point d'exclamation.
+- **Réglages > Stockage** : place prise par les sons et nettoyage de ceux qu'aucun projet n'utilise
+  (bloqué par sécurité si un projet est illisible).
+
 ## Nouveautés de la v2.3.2
 
 - **Recherche d'un son** (loupe 🔍, aussi en mode scène) : en tapant une partie du nom, l'appli va à la
@@ -101,6 +111,7 @@ ne doivent jamais être poussés sur le dépôt.
 | `lib/settings_screen.dart` | Réglages du projet et globaux |
 | `lib/project_archive.dart` | Export / import d'un projet (.zip) |
 | `lib/l10n.dart` | Textes de l'interface FR / EN |
+| `lib/storage_cleaner.dart` | Analyse et nettoyage des sons inutilisés |
 | `lib/audio_repair.dart` | Réparation sans perte des « faux MP3 » (MPEG-PS) |
 | `lib/native_files.dart` + `MainActivity.kt` | Enregistrer / partager un gros fichier sans le charger en mémoire |
 

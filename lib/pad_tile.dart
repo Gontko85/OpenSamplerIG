@@ -109,13 +109,22 @@ class PadTile extends StatelessWidget {
           ),
         Center(
           child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Text(
-              settings.caption,
-              textAlign: TextAlign.center,
-              style: captionStyle,
-              overflow: TextOverflow.fade,
-            ),
+            // Keep clear of the badges (group / loop) and of the remaining time.
+            padding: const EdgeInsets.fromLTRB(6, 16, 6, 16),
+            child: fontSize == null && settings.hasSample
+                ? AutoFitText(settings.caption, style: captionStyle)
+                : fontSize == null
+                ? Text(
+                    settings.caption,
+                    textAlign: TextAlign.center,
+                    style: captionStyle.copyWith(fontSize: 18),
+                  )
+                : Text(
+                    settings.caption,
+                    textAlign: TextAlign.center,
+                    style: captionStyle,
+                    overflow: TextOverflow.fade,
+                  ),
           ),
         ),
         // Exclusion group badge.
@@ -204,3 +213,95 @@ class PadTile extends StatelessWidget {
 }
 
 //==============================================================================
+
+/// Pad caption at the largest size that fits the pad (up to 3 lines).
+/// Sizes are cached: pads repaint every frame while a sound plays.
+class AutoFitText extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+  static const double minSize = 9;
+  static const double maxSize = 34;
+  static final Map<String, double> _cache = {};
+
+  const AutoFitText(this.text, {super.key, required this.style});
+
+  /// French typography: keep "!", "?", ":", ";" and "»" with the previous word
+  /// (no line break before them), and "«" with the next word.
+  static String glue(String t) =>
+      t.replaceAllMapped(RegExp(r' ([!?:;»])'), (m) => '\u00A0${m[1]}').replaceAll('« ', '«\u00A0');
+
+  static double fitSize(String text, double w, double h, TextScaler scaler, TextStyle base) {
+    if (w <= 0 || h <= 0 || text.isEmpty) return minSize;
+    final key = '$text|${w.round()}|${h.round()}|${scaler.scale(10)}|${base.fontFamily}';
+    final cached = _cache[key];
+    if (cached != null) return cached;
+
+    bool fits(double size) {
+      final tp = TextPainter(
+        // Measured in bold so the size does not change when the pad starts playing.
+        text: TextSpan(
+          text: text,
+          style: base.copyWith(fontSize: size, fontWeight: FontWeight.w700),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: 3,
+        textScaler: scaler,
+      )..layout(maxWidth: w);
+      final ok = !tp.didExceedMaxLines && tp.height <= h && tp.width <= w;
+      // A single word must not be cut in the middle of the word.
+      final words = text.split(RegExp(r'[ \t\n]+'));
+      bool wordsOk = true;
+      for (final word in words) {
+        final wp = TextPainter(
+          text: TextSpan(
+            text: word,
+            style: base.copyWith(fontSize: size, fontWeight: FontWeight.w700),
+          ),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+        )..layout();
+        if (wp.width > w) {
+          wordsOk = false;
+          break;
+        }
+      }
+      tp.dispose();
+      return ok && wordsOk;
+    }
+
+    double lo = minSize, hi = maxSize;
+    if (fits(hi)) {
+      lo = hi;
+    } else {
+      for (int k = 0; k < 7; k++) {
+        final mid = (lo + hi) / 2;
+        if (fits(mid)) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+    }
+    if (_cache.length > 2000) _cache.clear();
+    return _cache[key] = lo.floorToDouble();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final base = DefaultTextStyle.of(context).style.merge(style);
+        final t = glue(text);
+        final size = fitSize(t, c.maxWidth, c.maxHeight, MediaQuery.textScalerOf(context), base);
+        return Text(
+          t,
+          textAlign: TextAlign.center,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: style.copyWith(fontSize: size, height: 1.1),
+        );
+      },
+    );
+  }
+}

@@ -336,6 +336,14 @@ class GlobalPrefs {
   static const String showRemainingKey = "showRemaining";
   static const String keepScreenOnKey = "keepScreenOn";
   static const String stageLockKey = "stageLock";
+  static const String showNowPlayingKey = "showNowPlaying";
+  static const String showRecentKey = "showRecent";
+
+  static bool get showNowPlaying => preferences.getBool(showNowPlayingKey) ?? true;
+  static set showNowPlaying(bool v) => preferences.setBool(showNowPlayingKey, v);
+
+  static bool get showRecent => preferences.getBool(showRecentKey) ?? true;
+  static set showRecent(bool v) => preferences.setBool(showRecentKey, v);
 
   static String get fontSize => preferences.getString(fontSizeKey) ?? "Default";
   static set fontSize(String v) => preferences.setString(fontSizeKey, v);

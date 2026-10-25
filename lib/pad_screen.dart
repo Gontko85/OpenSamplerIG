@@ -5,6 +5,7 @@
 //    Modifications Copyright IG Littoral Labs 2026
 //==============================================================================
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -48,7 +49,10 @@ enum MenuAction {
 class PadScreen extends StatefulWidget {
   final Settings initialSettings;
 
-  const PadScreen(this.initialSettings, {super.key});
+  /// Audio engine (tests can pass their own).
+  final SampleEngine? engine;
+
+  const PadScreen(this.initialSettings, {super.key, this.engine});
 
   @override
   State<PadScreen> createState() => _PadScreenState();
@@ -58,7 +62,11 @@ class PadScreen extends StatefulWidget {
 
 class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMixin {
   late Settings _settings;
-  final SampleEngine _engine = SampleEngine();
+
+  /// The project as edited on screen (tests).
+  @visibleForTesting
+  Settings get debugSettings => _settings;
+  late final SampleEngine _engine = widget.engine ?? SampleEngine();
   late final Ticker _ticker;
   bool _stageLock = GlobalPrefs.stageLock;
 
@@ -69,6 +77,10 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   List<int> _matches = const [];
   int _matchPos = 0;
   bool _justTyped = false; // first "Enter" after typing keeps the first result
+
+  // A pad briefly framed after a tap in the "Now playing" strip.
+  Object? _flashPad;
+  Timer? _flashTimer;
 
   //----------------------------------------------------------------------------
 
@@ -85,6 +97,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    _flashTimer?.cancel();
     _searchCtl.dispose();
     _searchFocus.dispose();
     _ticker.dispose();
@@ -399,6 +412,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   }
 
   int _highlightOf(int i) {
+    if (_flashPad != null && identical(_flashPad, _settings.padSettings[i])) return 2;
     if (!_searching || _matches.isEmpty) return 0;
     if (_matches[_matchPos] == i) return 2;
     return _matches.contains(i) ? 1 : 0;
@@ -471,6 +485,146 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             color: Colors.white70,
             icon: const Icon(Icons.close),
             onPressed: _closeSearch,
+          ),
+        ],
+      ),
+    );
+  }
+
+  //----------------------------------------------------------------------------
+  // "Now playing" strip and recent sounds
+
+  /// Shows the page of pad [i] and frames the pad for a moment.
+  void _revealPad(int i) {
+    _flashTimer?.cancel();
+    setState(() {
+      _settings.currentPage = _settings.pageOf(i);
+      _flashPad = _settings.padSettings[i];
+    });
+    _flashTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _flashPad = null);
+    });
+  }
+
+  Widget _buildNowPlaying() {
+    final active = _engine.activeIndices();
+    return Container(
+      height: 50,
+      color: const Color(0xFF1B1B1B),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Tooltip(
+              message: S.nowPlaying,
+              child: const Icon(Icons.graphic_eq, color: Color(0xFF69F0AE), size: 22),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              itemCount: active.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (_, k) {
+                final i = active[k];
+                final v = _engine.voice(i)!;
+                final pad = _settings.padSettings[i];
+                final String time = v.state == VoiceState.paused
+                    ? S.paused
+                    : pad.looped
+                    ? PadTile.formatDuration(v.position)
+                    : (v.remaining != null ? '-${PadTile.formatDuration(v.remaining!)}' : '');
+                return Material(
+                  color: pad.color,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _revealPad(i),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 150),
+                            child: Text(
+                              pad.caption,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: pad.textColor, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            time,
+                            style: TextStyle(
+                              color: pad.textColor,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontSize: 13,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: S.stopThis,
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 22,
+                            color: pad.textColor,
+                            icon: Icon(v.state == VoiceState.fading ? Icons.flash_on : Icons.stop_circle),
+                            onPressed: () => _engine.stopPad(i),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecent(List<int> recent) {
+    return Container(
+      height: 44,
+      color: const Color(0xFF262626),
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Tooltip(
+              message: S.recentSounds,
+              child: const Icon(Icons.history, color: Colors.white60, size: 22),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              itemCount: recent.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (_, k) {
+                final i = recent[k];
+                final pad = _settings.padSettings[i];
+                final chip = Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: pad.color, borderRadius: BorderRadius.circular(8)),
+                  constraints: const BoxConstraints(maxWidth: 170),
+                  child: Text(
+                    pad.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: pad.textColor, fontWeight: FontWeight.w600),
+                  ),
+                );
+                // Same trigger as the pad itself (finger down in stage mode).
+                return _stageLock
+                    ? Listener(behavior: HitTestBehavior.opaque, onPointerDown: (_) => _press(i), child: chip)
+                    : GestureDetector(onTap: () => _press(i), child: chip);
+              },
+            ),
           ),
         ],
       ),
@@ -852,6 +1006,11 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     final bool showRemaining = GlobalPrefs.showRemaining;
     const double spacing = 4;
     _refreshMatches();
+    // Recent sounds that still exist in this project, as pad indexes.
+    final List<int> recent = [
+      for (final pad in _engine.recent)
+        if (_settings.padSettings.indexWhere((p) => identical(p, pad)) case final int i when i >= 0) i,
+    ];
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 60, 60, 60),
@@ -937,6 +1096,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                 ),
               ),
             ),
+            if (GlobalPrefs.showNowPlaying && _engine.anyActive) _buildNowPlaying(),
+            if (GlobalPrefs.showRecent && recent.isNotEmpty) _buildRecent(recent),
           ],
         ),
       ),

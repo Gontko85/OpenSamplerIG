@@ -95,4 +95,25 @@ void main() {
     expect(s.emptySlotsFrom(1), [5, 7, 8, 9, 10, 11]);
     expect(s.emptySlotsFrom(0).length, 10);
   });
+
+  test('search ignores case and accents, finds file names, project order', () {
+    final s = demo(); // 3 pages of 4 pads
+    s.padsOfPage(2)[1]
+      ..caption = 'Pilé'
+      ..sample = '/s/pile_1.mp3';
+    s.padsOfPage(0)[2]
+      ..caption = 'Entrée'
+      ..sample = '/s/Pilou Pilou.mp3';
+    s.padsOfPage(1)[0]
+      ..caption = 'ŒUVRE'
+      ..sample = '/s/x.mp3';
+    expect(s.searchPads('PILE'), [9]);
+    expect(s.searchPads('pil'), [2, 9]); // file name "Pilou Pilou" counts too
+    expect(s.searchPads('oeuvre'), [4]);
+    expect(s.searchPads('entree'), [2]);
+    expect(s.searchPads('  '), isEmpty);
+    expect(s.searchPads('3'), isEmpty, reason: 'blank pads showing their number are ignored');
+    expect(foldText('Àçéïôù ß'), 'aceiou ss');
+  });
 }
+

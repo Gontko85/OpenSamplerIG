@@ -91,6 +91,14 @@ class Strings {
     'The grid applies to every page of the project.',
   );
 
+  // Search
+  String get search => _t('Rechercher un son', 'Search a sound');
+  String get searchHint => _t('Nom de la touche…', 'Pad name…');
+  String get searchNone => _t('Aucun', 'None');
+  String get searchPrev => _t('Précédent', 'Previous');
+  String get searchNext => _t('Suivant', 'Next');
+  String get searchClose => _t('Fermer la recherche', 'Close search');
+
   // Bulk import
   String get bulkImport => _t('Importer plusieurs sons…', 'Import several sounds…');
   String get bulkImporting => _t('Import des sons…', 'Importing sounds…');
@@ -295,6 +303,11 @@ class Strings {
             '',
             'Les pads d\'un même groupe (A, B, C ou D) ne jouent jamais ensemble : en lancer un baisse puis arrête les autres. Idéal pour les musiques de fond.',
           ),
+          ('Rechercher un son', null),
+          (
+            '',
+            'La loupe 🔍 en haut ouvre la recherche (aussi en mode scène). Tapez une partie du nom : l\'appli va directement à la page de la première touche trouvée et l\'entoure en bleu. S\'il y a plusieurs résultats, « Entrée » ou les flèches ▲▼ passent au suivant. Majuscules et accents sont ignorés, et le nom du fichier compte aussi.',
+          ),
           ('Pages (onglets)', null),
           (
             '',
@@ -366,6 +379,11 @@ class Strings {
           (
             '',
             'Pads in the same group (A, B, C or D) never play together: starting one fades out the others. Ideal for background music.',
+          ),
+          ('Search a sound', null),
+          (
+            '',
+            'The magnifier 🔍 at the top opens the search (also in stage mode). Type part of the name: the app jumps to the page of the first matching pad and frames it in blue. With several results, "Enter" or the ▲▼ arrows go to the next one. Case and accents are ignored, and file names count too.',
           ),
           ('Pages (tabs)', null),
           (

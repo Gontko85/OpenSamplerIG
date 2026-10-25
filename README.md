@@ -4,6 +4,13 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.3.2
+
+- **Recherche d'un son** (loupe 🔍, aussi en mode scène) : en tapant une partie du nom, l'appli va à la
+  page de la première touche trouvée et l'encadre en bleu ; ▲▼ ou Entrée pour les résultats suivants.
+  Majuscules et accents ignorés, le nom du fichier compte aussi.
+- Changement de page net (plus de bref fondu de couleurs entre les pages).
+
 ## Nouveautés de la v2.3.1
 
 - **Réparation automatique des « faux MP3 »** : des fichiers .mp3 qui sont en réalité des vidéos MPEG

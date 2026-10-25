@@ -251,6 +251,23 @@ class Settings {
       if (!padSettings[i].hasSample) i,
   ];
 
+  /// Pads whose name (or sound file name) contains [query], in project order
+  /// (page 1 first). Case and accents are ignored: "pile" finds "Pilé".
+  List<int> searchPads(String query) {
+    final q = foldText(query.trim());
+    if (q.isEmpty) return const [];
+    final List<int> found = [];
+    for (int i = 0; i < padSettings.length; i++) {
+      final pad = padSettings[i];
+      if (!pad.hasSample && int.tryParse(pad.caption.trim()) != null) continue; // blank pad "12"
+      final file = pad.hasSample
+          ? pad.sample.split(RegExp(r'[\\/]')).last.replaceFirst(RegExp(r'\.[^.]*$'), '')
+          : '';
+      if (foldText(pad.caption).contains(q) || foldText(file).contains(q)) found.add(i);
+    }
+    return found;
+  }
+
   /// Display name of a page ("Page 2" when not named).
   String pageLabel(int page, String Function(int) fallback) =>
       pageNames[page].trim().isEmpty ? fallback(page + 1) : pageNames[page];
@@ -274,6 +291,37 @@ class Settings {
     padSettings = out;
     _layoutN = newN;
   }
+}
+
+/// Lower case, without accents, for forgiving text search.
+String foldText(String s) {
+  const groups = {
+    'a': 'àáâãäåā',
+    'c': 'çćč',
+    'e': 'èéêëēėę',
+    'i': 'ìíîïīį',
+    'n': 'ñń',
+    'o': 'òóôõöøō',
+    'u': 'ùúûüū',
+    'y': 'ÿý',
+    'z': 'žźż',
+    'oe': 'œ',
+    'ae': 'æ',
+    'ss': 'ß',
+  };
+  final b = StringBuffer();
+  for (final r in s.toLowerCase().runes) {
+    final ch = String.fromCharCode(r);
+    String out = ch;
+    for (final e in groups.entries) {
+      if (e.value.contains(ch)) {
+        out = e.key;
+        break;
+      }
+    }
+    b.write(out);
+  }
+  return b.toString();
 }
 
 Settings defaultSettings() => Settings.temp("Open Sampler", 3, 3);

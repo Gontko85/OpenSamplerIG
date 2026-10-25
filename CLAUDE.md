@@ -14,6 +14,7 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   réglages d'un pad compactés sur un seul écran.
 - v2.3.1 (livrée) : réparation auto des « faux MP3 » (MPEG-PS contenant du MP3, cause de la
   pastille rouge chez Ivan), retry en son long, raison de l'erreur affichée.
+- v2.3.2 (livrée) : recherche de son (loupe, cadre bleu #2979FF, ▲▼), PadTile clé = PadSettings.
 - Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
   - v2.4 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
     dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,

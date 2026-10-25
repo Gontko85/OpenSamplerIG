@@ -21,6 +21,12 @@ class PadTile extends StatelessWidget {
   final VoidCallback onTrigger;
   final VoidCallback onEdit;
 
+  /// Search highlight: 0 = none, 1 = another match, 2 = the current match.
+  final int highlight;
+
+  /// Colour of the search frame (distinct from white = playing, amber = paused, red = error).
+  static const Color searchColor = Color(0xFF2979FF);
+
   const PadTile({
     super.key,
     required this.settings,
@@ -30,6 +36,7 @@ class PadTile extends StatelessWidget {
     required this.stageLock,
     required this.onTrigger,
     required this.onEdit,
+    this.highlight = 0,
   });
 
   static String formatDuration(Duration d) {
@@ -156,7 +163,10 @@ class PadTile extends StatelessWidget {
       color: settings.color,
       borderRadius: BorderRadius.circular(6),
       border: outline != null ? Border.all(color: outline, width: 3) : null,
-      boxShadow: state == VoiceState.playing
+      boxShadow: highlight == 2
+          // Search result: blue glow around the pad (behind it, so the text stays readable).
+          ? [BoxShadow(color: searchColor.withValues(alpha: 0.95), blurRadius: 16, spreadRadius: 4)]
+          : state == VoiceState.playing
           ? [BoxShadow(color: Colors.white.withValues(alpha: 0.45), blurRadius: 10, spreadRadius: 1)]
           : null,
     );
@@ -164,6 +174,12 @@ class PadTile extends StatelessWidget {
     final Widget body = AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       decoration: decoration,
+      foregroundDecoration: highlight == 0
+          ? null
+          : BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: searchColor, width: highlight == 2 ? 6 : 2.5),
+            ),
       clipBehavior: Clip.antiAlias,
       child: content,
     );

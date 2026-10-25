@@ -62,6 +62,14 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   late final Ticker _ticker;
   bool _stageLock = GlobalPrefs.stageLock;
 
+  // Search
+  bool _searching = false;
+  final TextEditingController _searchCtl = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  List<int> _matches = const [];
+  int _matchPos = 0;
+  bool _justTyped = false; // first "Enter" after typing keeps the first result
+
   //----------------------------------------------------------------------------
 
   @override
@@ -77,6 +85,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    _searchCtl.dispose();
+    _searchFocus.dispose();
     _ticker.dispose();
     _engine.removeListener(_onEngineChanged);
     _engine.dispose();
@@ -336,6 +346,136 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   }
 
   //----------------------------------------------------------------------------
+
+  //----------------------------------------------------------------------------
+  // Search
+
+  void _openSearch() {
+    setState(() => _searching = true);
+    _searchFocus.requestFocus();
+  }
+
+  void _closeSearch() {
+    setState(() {
+      _searching = false;
+      _matches = const [];
+      _matchPos = 0;
+      _searchCtl.clear();
+    });
+    _searchFocus.unfocus();
+  }
+
+  /// New text: find all matches and jump to the first one.
+  void _onSearchChanged(String text) {
+    setState(() {
+      _matches = _settings.searchPads(text);
+      _matchPos = 0;
+      _justTyped = true;
+    });
+    _showMatch();
+  }
+
+  /// Enter / arrows: go to the next (or previous) match.
+  void _stepMatch(int delta) {
+    if (_matches.isEmpty) return;
+    setState(() => _matchPos = (_matchPos + delta) % _matches.length);
+    _showMatch();
+  }
+
+  void _showMatch() {
+    if (_matches.isEmpty) return;
+    final page = _settings.pageOf(_matches[_matchPos]);
+    if (page != _page) setState(() => _settings.currentPage = page);
+  }
+
+  /// Keeps the results right after a pad was renamed / moved during a search.
+  void _refreshMatches() {
+    if (!_searching || _searchCtl.text.trim().isEmpty) return;
+    final fresh = _settings.searchPads(_searchCtl.text);
+    if (fresh.length != _matches.length || !fresh.every(_matches.contains)) {
+      _matches = fresh;
+      if (_matchPos >= _matches.length) _matchPos = 0;
+    }
+  }
+
+  int _highlightOf(int i) {
+    if (!_searching || _matches.isEmpty) return 0;
+    if (_matches[_matchPos] == i) return 2;
+    return _matches.contains(i) ? 1 : 0;
+  }
+
+  Widget _buildSearchBar() {
+    final bool hasText = _searchCtl.text.trim().isNotEmpty;
+    final bool none = hasText && _matches.isEmpty;
+    return Container(
+      color: const Color(0xFF1F2A3A),
+      padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
+      child: Row(
+        children: [
+          const Icon(Icons.search, color: PadTile.searchColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _searchCtl,
+              focusNode: _searchFocus,
+              style: const TextStyle(color: Colors.white, fontSize: 17),
+              cursorColor: Colors.white,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: S.searchHint,
+                hintStyle: const TextStyle(color: Colors.white54),
+              ),
+              onChanged: _onSearchChanged,
+              onSubmitted: (_) {
+                if (_justTyped) {
+                  _justTyped = false;
+                } else {
+                  _stepMatch(1);
+                }
+              },
+            ),
+          ),
+          if (hasText)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                none ? S.searchNone : '${_matchPos + 1}/${_matches.length}',
+                style: TextStyle(
+                  color: none ? Colors.redAccent : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          if (_matches.length > 1) ...[
+            IconButton(
+              tooltip: S.searchPrev,
+              visualDensity: VisualDensity.compact,
+              color: Colors.white,
+              icon: const Icon(Icons.keyboard_arrow_up),
+              onPressed: () => _stepMatch(-1),
+            ),
+            IconButton(
+              tooltip: S.searchNext,
+              visualDensity: VisualDensity.compact,
+              color: Colors.white,
+              icon: const Icon(Icons.keyboard_arrow_down),
+              onPressed: () => _stepMatch(1),
+            ),
+          ],
+          IconButton(
+            tooltip: S.searchClose,
+            visualDensity: VisualDensity.compact,
+            color: Colors.white70,
+            icon: const Icon(Icons.close),
+            onPressed: _closeSearch,
+          ),
+        ],
+      ),
+    );
+  }
 
   void _toggleStageLock() {
     setState(() {
@@ -711,6 +851,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     final double? fontSize = prefFont != "Default" ? double.tryParse(prefFont) : null;
     final bool showRemaining = GlobalPrefs.showRemaining;
     const double spacing = 4;
+    _refreshMatches();
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 60, 60, 60),
@@ -718,6 +859,11 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
         titleSpacing: 12,
         title: Text(_settings.name, overflow: TextOverflow.ellipsis, maxLines: 1),
         actions: [
+          IconButton(
+            tooltip: S.search,
+            icon: Icon(_searching ? Icons.search_off : Icons.search),
+            onPressed: _searching ? _closeSearch : _openSearch,
+          ),
           _StopButton(
             width: MediaQuery.sizeOf(context).width * 0.25,
             active: _engine.anyActive,
@@ -755,6 +901,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
         child: Column(
           children: [
             // Page tabs (hidden in stage mode when the project has a single page).
+            if (_searching) _buildSearchBar(),
             if (_settings.pageCount > 1 || !_stageLock) _buildPageTabs(),
             Expanded(
               child: Padding(
@@ -769,6 +916,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                             child: Padding(
                               padding: const EdgeInsets.all(spacing / 2),
                               child: PadTile(
+                                // One identity per pad: switching page shows the new pads at once
+                                // (no colour fade from the pads of the previous page).
+                                key: ValueKey(_settings.padSettings[i]),
                                 settings: _settings.padSettings[i],
                                 voice: _engine.voice(i),
                                 fontSize: fontSize,
@@ -776,6 +926,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                                 stageLock: _stageLock,
                                 onTrigger: () => _press(i),
                                 onEdit: () => _editPad(i),
+                                highlight: _highlightOf(i),
                               ),
                             ),
                           );

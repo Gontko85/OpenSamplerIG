@@ -7,6 +7,7 @@ import 'package:opensampler/l10n.dart';
 import 'package:opensampler/main.dart';
 import 'package:opensampler/pad_screen.dart';
 import 'package:opensampler/pad_settings_screen.dart';
+import 'package:opensampler/pad_tile.dart';
 import 'package:opensampler/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -92,4 +93,52 @@ void main() {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/pad_settings_fr_$name.png'));
     });
   }
+
+  testWidgets('search jumps to the page of the first match and frames it', (tester) async {
+    setLanguage('fr');
+    await tester.runAsync(_loadFonts);
+    tester.view.physicalSize = const Size(1080, 2000);
+    tester.view.devicePixelRatio = 2.75;
+    final s = _demo(); // pages: Match, Mi-temps, Animations
+    s.padsOfPage(2)[4]
+      ..caption = 'Hymne LSVB'
+      ..color = const Color(0xFF3949AB)
+      ..textColor = Colors.white;
+    s.padsOfPage(2)[7]
+      ..caption = 'Hymne (court)'
+      ..color = const Color(0xFF3949AB)
+      ..textColor = Colors.white;
+    await tester.pumpWidget(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+      home: PadScreen(s),
+    ));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'hymne');
+    await tester.pump();
+
+    PadTile cur() => tester.widgetList<PadTile>(find.byType(PadTile)).singleWhere((t) => t.highlight == 2);
+
+    // 3 results: "Hymne" on page Match, then the two on page Animations.
+    expect(find.text('1/3'), findsOneWidget);
+    expect(cur().settings.caption, 'Hymne');
+    expect(find.text('Entrée joueurs'), findsOneWidget, reason: 'page Match shown');
+
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
+    await tester.pump();
+    expect(cur().settings.caption, 'Hymne LSVB');
+    expect(find.text('Entrée joueurs'), findsNothing, reason: 'jumped to page Animations');
+    expect(find.text('2/3'), findsOneWidget);
+
+    // Direct hit on another page.
+    await tester.enterText(find.byType(TextField), 'lsvb');
+    await tester.pump();
+    expect(find.text('1/1'), findsOneWidget);
+    expect(cur().settings.caption, 'Hymne LSVB');
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/search_fr.png'));
+  });
 }
+

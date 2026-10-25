@@ -12,6 +12,8 @@ import 'package:path/path.dart' as p;
 
 import 'dialogs.dart';
 import 'l10n.dart';
+import 'pad_picker.dart';
+import 'playlist_screen.dart';
 import 'sample_store.dart';
 import 'settings.dart';
 
@@ -100,13 +102,22 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     final ok = await confirm(context, content: Text(S.removeConfirm));
     if (!ok) return;
     // Remove the sound AND its name: the pad goes back to a blank pad (shows its number).
-    _pad.sample = "";
-    _pad.durationMs = 0;
+    _pad.clearSound(); // the sound and all the tracks of a playlist
     _problem = null;
     _pad.caption = "${widget.project.indexInPage(widget.index) + 1}";
     _caption.text = _pad.caption;
     await widget.project.save();
     setState(() {});
+  }
+
+  Future<void> _openPlaylist() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => PlaylistScreen(_pad)));
+    if (!_pad.hasSample) {
+      _pad.caption = "${widget.project.indexInPage(widget.index) + 1}";
+      _caption.text = _pad.caption;
+    }
+    await widget.project.save();
+    if (mounted) setState(() {});
   }
 
   Future<void> _customColor({required bool text}) async {
@@ -135,7 +146,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
   Future<void> _arrange({required bool copy}) async {
     final int? target = await showDialog<int>(
       context: context,
-      builder: (ctx) => _PadPickerDialog(
+      builder: (ctx) => PadPickerDialog(
         project: widget.project,
         current: widget.index,
         title: copy ? S.pickTargetCopy : S.pickTargetSwap,
@@ -150,7 +161,7 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
         final ok = await confirm(context, content: Text(S.overwriteConfirm(dest.caption)));
         if (!ok) return;
       }
-      pads[target] = PadSettings.copy(_pad);
+      pads[target] = _pad.duplicate();
     } else {
       final a = pads[widget.index];
       pads[widget.index] = pads[target];
@@ -310,6 +321,27 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                   ],
                 ],
               ),
+
+              // 2b. Playlist: several tracks on one pad.
+              if (_pad.hasSample)
+                Row(
+                  children: [
+                    Icon(_pad.shuffle ? Icons.shuffle : Icons.queue_music, size: 20),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _pad.isPlaylist
+                            ? S.playlistSummary(_pad.tracks.length, _pad.shuffle)
+                            : S.playlistNone,
+                        style: _pad.isPlaylist ? null : TextStyle(color: theme.hintColor),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _openPlaylist,
+                      child: Text(_pad.isPlaylist ? S.playlistManage : S.playlistCreate),
+                    ),
+                  ],
+                ),
               gap,
 
               // 3. Loop / long sound / exclusion group on one line.
@@ -323,7 +355,8 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                     label: Text(S.loopShort),
                     selected: _pad.looped,
                     showCheckmark: false,
-                    onSelected: (v) => setState(() => _pad.looped = v),
+                    // A playlist moves on to the next track instead of looping.
+                    onSelected: _pad.isPlaylist ? null : (v) => setState(() => _pad.looped = v),
                   ),
                   FilterChip(
                     avatar: const Icon(Icons.queue_music, size: 18),
@@ -472,105 +505,3 @@ class _ColorRow extends StatelessWidget {
 }
 
 //==============================================================================
-
-/// Shows the pad grid in miniature to pick a target pad (on any page).
-class _PadPickerDialog extends StatefulWidget {
-  final Settings project;
-  final int current;
-  final String title;
-
-  const _PadPickerDialog({required this.project, required this.current, required this.title});
-
-  @override
-  State<_PadPickerDialog> createState() => _PadPickerDialogState();
-}
-
-class _PadPickerDialogState extends State<_PadPickerDialog> {
-  late int _page = widget.project.pageOf(widget.current);
-
-  @override
-  Widget build(BuildContext context) {
-    final project = widget.project;
-    final int cols = project.x;
-    final int rows = project.y;
-    return AlertDialog(
-      title: Text(widget.title, style: const TextStyle(fontSize: 17)),
-      contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
-      content: SizedBox(
-        width: 320,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (project.pageCount > 1)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (int p = 0; p < project.pageCount; p++)
-                      ChoiceChip(
-                        label: Text(project.pageLabel(p, S.pageN)),
-                        selected: p == _page,
-                        onSelected: (_) => setState(() => _page = p),
-                      ),
-                  ],
-                ),
-              ),
-            AspectRatio(
-              aspectRatio: cols / rows * 1.4,
-              child: Column(
-                children: List.generate(
-                  rows,
-                  (r) => Expanded(
-                    child: Row(
-                      children: List.generate(cols, (c) {
-                        final int i = project.globalIndex(_page, r * cols + c);
-                        final pad = project.padSettings[i];
-                        final bool isCurrent = i == widget.current;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(2),
-                            child: Material(
-                              color: pad.hasSample ? pad.color : Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(4),
-                              child: InkWell(
-                                onTap: isCurrent ? null : () => Navigator.pop(context, i),
-                                child: Container(
-                                  alignment: Alignment.center,
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: isCurrent
-                                      ? BoxDecoration(
-                                          border: Border.all(color: Colors.black, width: 2),
-                                          borderRadius: BorderRadius.circular(4),
-                                        )
-                                      : null,
-                                  child: Text(
-                                    isCurrent ? '(${S.thisPad})' : pad.caption,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: pad.hasSample ? pad.textColor : Colors.black54,
-                                      fontStyle: isCurrent ? FontStyle.italic : null,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(S.cancel))],
-    );
-  }
-}

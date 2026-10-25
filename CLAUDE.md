@@ -17,15 +17,14 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - v2.3.2 (livrée) : recherche de son (loupe, cadre bleu #2979FF, ▲▼), PadTile clé = PadSettings.
 - v2.4.0 (livrée) : bandeau « En cours » (stop par son), sons récents (8, par identité de
   PadSettings), texte auto-ajusté (AutoFitText, plafond 34, ponctuation insécable), nettoyage du stockage.
-- Prochaines évolutions validées par Ivan (à coder après ses essais en match réel) :
-  - v2.5 proposée : point de départ/fin d'un son + fondu d'entrée par pad, clignotement du pad
-    dans les dernières secondes, vibration au déclenchement, code PIN pour quitter le mode scène,
-    verrouillage de l'orientation.
-  - v2.6 proposée : pad « playlist »
-    (morceau suivant / aléatoire à chaque appui), baisse auto de la musique (ducking) pour pads prioritaires.
-  - Idée gardée en réserve : « conducteur » de match (déroulé de sons + bouton Suivant),
-    copier une touche vers un autre projet.
-  - Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
+- v2.5.0 (livrée) : conducteur de match (Settings.rundowns, étapes = id stable de pad + note,
+  panneau ▶ « À suivre » au-dessus de la grille, anti-rebond 400 ms) et pad playlist
+  (PadSettings.extraTracks + shuffle, morceau suivant pré-chargé via _armNext, lecteur mediaPlayer).
+- En réserve (pas utiles à Ivan pour l'instant, à garder pour plus tard) : point de départ/fin d'un son,
+  fondu d'entrée par pad, clignotement du pad dans les dernières secondes, vibration au déclenchement,
+  code PIN pour quitter le mode scène, verrouillage de l'orientation, baisse auto de la musique
+  (ducking) pour pads prioritaires, copier une touche vers un autre projet.
+- Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
     télécommande/pédale Bluetooth.
 
 ## Compiler dans une session cloud
@@ -62,4 +61,6 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - Contexte audio global avec `AndroidAudioFocus.none`, sinon les pads se coupent entre eux.
 - Pads « courts » = PlayerMode.lowLatency (SoundPool) : aucune position ni fin de lecture,
   d'où l'horloge interne dans `PadVoice` et la durée sondée/mise en cache (`durationMs`).
+- Ids de pads : `PadSettings.id` stable (copié par `copy`, nouveau via `duplicate()`), utilisé par les
+  étapes de conducteur (`Settings.padIndexOfStep` → -1 si touche vide/supprimée).
 - Compatibilité : les JSON de projet 2021 doivent rester lisibles (test/settings_test.dart).

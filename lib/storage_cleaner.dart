@@ -55,7 +55,9 @@ class StorageCleaner {
     final List<String> unreadable = [];
     void addProject(Settings s) {
       for (final pad in s.padSettings) {
-        if (pad.hasSample) used.add(p.basename(pad.sample));
+        for (final t in pad.tracks) {
+          used.add(p.basename(t)); // every track of a playlist counts
+        }
       }
     }
 

@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:path/path.dart' as p;
@@ -25,6 +26,7 @@ import 'native_files.dart';
 import 'pad_settings_screen.dart';
 import 'pad_tile.dart';
 import 'project_archive.dart';
+import 'rundown_screen.dart';
 import 'sample_engine.dart';
 import 'sample_store.dart';
 import 'settings.dart';
@@ -37,6 +39,7 @@ enum MenuAction {
   saveProject,
   openProject,
   bulkImport,
+  rundowns,
   exportProject,
   importProject,
   settings,
@@ -69,6 +72,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   late final SampleEngine _engine = widget.engine ?? SampleEngine();
   late final Ticker _ticker;
   bool _stageLock = GlobalPrefs.stageLock;
+  bool _showRundown = GlobalPrefs.showRundown;
+  Timer? _rundownCooldown; // ignores a finger bounce on the big ▶ button
 
   // Search
   bool _searching = false;
@@ -98,6 +103,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _flashTimer?.cancel();
+    _rundownCooldown?.cancel();
     _searchCtl.dispose();
     _searchFocus.dispose();
     _ticker.dispose();
@@ -207,6 +213,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     // Reload only this pad if its sound changed: the others keep playing.
     final bool audioChanged =
         after.sample != before.sample ||
+        !listEquals(after.tracks, before.tracks) ||
+        after.shuffle != before.shuffle ||
         after.looped != before.looped ||
         after.long != before.long ||
         after.volume != before.volume;
@@ -547,9 +555,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 150),
+                            constraints: const BoxConstraints(maxWidth: 220),
                             child: Text(
-                              pad.caption,
+                              v.trackName != null ? '${pad.caption} · ${v.trackName}' : pad.caption,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: pad.textColor, fontWeight: FontWeight.w600),
@@ -580,6 +588,275 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  //----------------------------------------------------------------------------
+  // Match rundown ("conducteur")
+
+  Future<void> _goToRundowns({Rundown? edit}) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => edit != null ? RundownEditScreen(_settings, edit) : RundownsScreen(_settings),
+      ),
+    );
+    await _settings.save();
+    if (mounted) setState(() {});
+  }
+
+  /// Plays the "up next" step and moves on.
+  void _playNextStep() {
+    final r = _settings.rundown;
+    if (r == null || r.finished) return;
+    // A second tap in a row (finger bounce) must not skip a step.
+    if (_rundownCooldown?.isActive ?? false) return;
+    _rundownCooldown = Timer(const Duration(milliseconds: 400), () {});
+    final int i = _settings.padIndexOfStep(r.steps[r.position]);
+    if (i >= 0) _press(i);
+    _moveRundown(r.position + 1);
+  }
+
+  void _moveRundown(int position) {
+    final r = _settings.rundown;
+    if (r == null) return;
+    setState(() => r.position = position.clamp(0, r.steps.length));
+    _settings.save();
+  }
+
+  void _selectRundown(int k) {
+    setState(() => _settings.currentRundown = k);
+    _settings.save();
+  }
+
+  Future<void> _showRundownSteps() async {
+    final r = _settings.rundown;
+    if (r == null) return;
+    final int? k = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: r.steps.length,
+            itemBuilder: (_, k) {
+              final s = r.steps[k];
+              final int i = _settings.padIndexOfStep(s);
+              final caption = _settings.stepCaption(s);
+              return ListTile(
+                selected: k == r.position,
+                leading: StepBadge(number: k + 1, color: i >= 0 ? _settings.padSettings[i].color : null),
+                title: Text(
+                  caption.isEmpty ? '—' : caption,
+                  style: TextStyle(
+                    decoration: k < r.position ? TextDecoration.lineThrough : null,
+                    fontWeight: k == r.position ? FontWeight.bold : null,
+                  ),
+                ),
+                subtitle: Text([if (i < 0) S.rundownMissingPad, if (s.note.isNotEmpty) s.note].join(' · ')),
+                trailing: k == r.position ? Text(S.rundownNext) : null,
+                onTap: () => Navigator.pop(ctx, k),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    if (k != null) _moveRundown(k);
+  }
+
+  Widget _buildRundown() {
+    const bg = Color(0xFF1F2A1F);
+    final r = _settings.rundown;
+    if (r == null) {
+      return Container(
+        color: bg,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          children: [
+            const Icon(Icons.playlist_play, color: Colors.white60),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(S.rundownNoneYet, style: const TextStyle(color: Colors.white70)),
+            ),
+            if (!_stageLock) TextButton(onPressed: _goToRundowns, child: Text(S.rundownCreate)),
+          ],
+        ),
+      );
+    }
+
+    final int n = r.steps.length;
+    final RundownStep? next = r.finished ? null : r.steps[r.position];
+    final RundownStep? played = r.position > 0 && r.position <= n ? r.steps[r.position - 1] : null;
+    final int nextPad = next != null ? _settings.padIndexOfStep(next) : -1;
+    final PadSettings? padNext = nextPad >= 0 ? _settings.padSettings[nextPad] : null;
+    const small = TextStyle(color: Colors.white70, fontSize: 13);
+
+    // Big button: the colour of the pad it will play.
+    final Widget bigButton = next == null
+        ? FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.grey.shade800,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: n > 0 ? () => _moveRundown(0) : null,
+            icon: const Icon(Icons.replay),
+            label: Text('${S.rundownFinished} — ${S.rundownRestart}'),
+          )
+        : FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: padNext?.color ?? Colors.grey.shade800,
+              foregroundColor: padNext?.textColor ?? Colors.white,
+              minimumSize: const Size.fromHeight(56),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Colors.white, width: 2),
+              ),
+            ),
+            onPressed: _playNextStep,
+            child: Row(
+              children: [
+                const Icon(Icons.play_arrow, size: 34),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _settings.stepCaption(next).isEmpty ? '—' : _settings.stepCaption(next),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          decoration: padNext == null ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                      if (next.note.isNotEmpty || padNext == null)
+                        Text(
+                          padNext == null ? S.rundownMissingPad : next.note,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+
+    return Container(
+      color: bg,
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              // Rundown selector.
+              PopupMenuButton<int>(
+                tooltip: S.rundowns,
+                onSelected: (k) => k < 0 ? _goToRundowns() : _selectRundown(k),
+                itemBuilder: (_) => [
+                  for (int k = 0; k < _settings.rundowns.length; k++)
+                    CheckedPopupMenuItem(
+                      value: k,
+                      checked: k == _settings.currentRundown,
+                      child: Text(_settings.rundowns[k].name),
+                    ),
+                  if (!_stageLock) ...[
+                    const PopupMenuDivider(),
+                    PopupMenuItem(value: -1, child: Text(S.rundowns)),
+                  ],
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 140),
+                        child: Text(
+                          r.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                    ],
+                  ),
+                ),
+              ),
+              Text('${(r.position + (r.finished ? 0 : 1)).clamp(0, n)}/$n', style: small),
+              const Spacer(),
+              IconButton(
+                tooltip: S.rundownBack,
+                visualDensity: VisualDensity.compact,
+                color: Colors.white,
+                onPressed: r.position > 0 ? () => _moveRundown(r.position - 1) : null,
+                icon: const Icon(Icons.skip_previous),
+              ),
+              IconButton(
+                tooltip: S.rundownSkip,
+                visualDensity: VisualDensity.compact,
+                color: Colors.white,
+                onPressed: next != null ? () => _moveRundown(r.position + 1) : null,
+                icon: const Icon(Icons.skip_next),
+              ),
+              IconButton(
+                tooltip: S.rundownList,
+                visualDensity: VisualDensity.compact,
+                color: Colors.white,
+                onPressed: n > 0 ? _showRundownSteps : null,
+                icon: const Icon(Icons.format_list_numbered),
+              ),
+              if (!_stageLock)
+                IconButton(
+                  tooltip: S.rundownEdit,
+                  visualDensity: VisualDensity.compact,
+                  color: Colors.white,
+                  onPressed: () => _goToRundowns(edit: r),
+                  icon: const Icon(Icons.edit),
+                ),
+            ],
+          ),
+          if (n == 0)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(S.rundownStepsEmpty.split('\n').first, style: small, textAlign: TextAlign.center),
+            )
+          else
+            bigButton,
+          if (played != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.check, size: 15, color: Colors.white70),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${S.rundownPlayed} : ${_settings.stepCaption(played)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: small,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -979,6 +1256,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       case MenuAction.bulkImport:
         _bulkImport();
         break;
+      case MenuAction.rundowns:
+        _goToRundowns();
+        break;
       case MenuAction.exportProject:
         _goToExport();
         break;
@@ -1023,6 +1303,12 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             icon: Icon(_searching ? Icons.search_off : Icons.search),
             onPressed: _searching ? _closeSearch : _openSearch,
           ),
+          IconButton(
+            tooltip: S.rundownToggle,
+            icon: const Icon(Icons.playlist_play),
+            color: _showRundown ? Colors.lightGreenAccent : null,
+            onPressed: () => setState(() => GlobalPrefs.showRundown = _showRundown = !_showRundown),
+          ),
           _StopButton(
             width: MediaQuery.sizeOf(context).width * 0.25,
             active: _engine.anyActive,
@@ -1045,6 +1331,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                 PopupMenuItem(value: MenuAction.openProject, child: Text(S.openProject)),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: MenuAction.bulkImport, child: Text(S.bulkImport)),
+                PopupMenuItem(value: MenuAction.rundowns, child: Text(S.rundowns)),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: MenuAction.exportProject, child: Text(S.exportProject)),
                 PopupMenuItem(value: MenuAction.importProject, child: Text(S.importProject)),
@@ -1062,6 +1349,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             // Page tabs (hidden in stage mode when the project has a single page).
             if (_searching) _buildSearchBar(),
             if (_settings.pageCount > 1 || !_stageLock) _buildPageTabs(),
+            if (_showRundown) _buildRundown(),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(spacing),

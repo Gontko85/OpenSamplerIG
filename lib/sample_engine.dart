@@ -7,10 +7,12 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 
 import 'audio_repair.dart';
 
@@ -56,7 +58,25 @@ class PadVoice {
 
   PadVoice(this.index, this.settings);
 
-  bool get isLowLatency => !settings.long;
+  /// Playlist: index (in settings.tracks) of the track loaded in the player.
+  int track = 0;
+
+  /// Shuffle: tracks not played yet in this round.
+  final List<int> _bag = [];
+
+  /// Set while the next playlist track is being loaded.
+  Future<void>? arming;
+
+  /// Name of the loaded track (playlists), shown on the pad and in the strip.
+  String? get trackName {
+    final t = settings.tracks;
+    if (!settings.isPlaylist || track >= t.length) return null;
+    return p.basenameWithoutExtension(t[track]).replaceFirst(RegExp(r'_\d{13}$'), '');
+  }
+
+  /// Media player (long sounds, playlists) or SoundPool (short sounds).
+  bool get usesMediaPlayer => settings.long || settings.isPlaylist;
+  bool get isLowLatency => !usesMediaPlayer;
   bool get isActive => state == VoiceState.playing || state == VoiceState.fading;
 
   Duration get position {
@@ -288,17 +308,28 @@ class SampleEngine extends ChangeNotifier {
     // Unique id: pads can move between indexes (page moves), ids must never collide.
     final player = AudioPlayer(playerId: 'pad_${_nextPlayerId++}');
     v.player = player;
-    await player.setPlayerMode(pad.long ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
-    await player.setReleaseMode(pad.looped ? ReleaseMode.loop : ReleaseMode.stop);
+    final bool media = v.usesMediaPlayer;
+    await player.setPlayerMode(media ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
+    await player.setReleaseMode(pad.looped && !pad.isPlaylist ? ReleaseMode.loop : ReleaseMode.stop);
     await player.setVolume(pad.volume);
-    await player.setSource(DeviceFileSource(pad.sample));
+
+    if (pad.isPlaylist) {
+      // First track: the first one, or a random one.
+      v.track = pad.shuffle ? _takeFromBag(v) : 0;
+      await player.setSource(DeviceFileSource(pad.tracks[v.track]));
+      v.duration = await _trackDuration(player, pad.tracks[v.track]);
+    } else {
+      await player.setSource(DeviceFileSource(pad.sample));
+    }
 
     // Duration: cached, or read from the player, or probed with a temporary player.
-    if (pad.durationMs > 0) {
+    if (pad.isPlaylist) {
+      // already set above
+    } else if (pad.durationMs > 0) {
       v.duration = Duration(milliseconds: pad.durationMs);
     } else {
       Duration? d;
-      if (pad.long) {
+      if (media) {
         d = await player.getDuration();
       } else {
         d = await _probeDuration(pad.sample);
@@ -310,7 +341,7 @@ class SampleEngine extends ChangeNotifier {
       }
     }
 
-    if (pad.long) {
+    if (media) {
       v._subs.add(player.onPlayerComplete.listen((_) => _onComplete(v)));
       v._subs.add(
         player.onPositionChanged.listen((pos) {
@@ -321,6 +352,60 @@ class SampleEngine extends ChangeNotifier {
           }
         }),
       );
+    }
+  }
+
+  //----------------------------------------------------------------------------
+  // Playlists
+
+  static final Map<String, int> _trackDurations = {};
+
+  Future<Duration?> _trackDuration(AudioPlayer player, String path) async {
+    final cached = _trackDurations[path];
+    if (cached != null) return Duration(milliseconds: cached);
+    final d = await player.getDuration();
+    if (d != null && d > Duration.zero) _trackDurations[path] = d.inMilliseconds;
+    return d;
+  }
+
+  /// Shuffle: next random track, never the same twice before all were played.
+  int _takeFromBag(PadVoice v) {
+    final n = v.settings.tracks.length;
+    if (v._bag.isEmpty) {
+      v._bag.addAll(List.generate(n, (i) => i));
+      if (n > 1) v._bag.remove(v.track); // never the same track twice in a row
+      v._bag.shuffle(_random);
+    }
+    return v._bag.removeLast();
+  }
+
+  final _random = Random();
+
+  /// After a playlist track stopped: load the next one now, so that the next
+  /// press starts instantly. Skips tracks that cannot be loaded.
+  Future<void> _armNext(PadVoice v) async {
+    final pad = v.settings;
+    final player = v.player;
+    if (!pad.isPlaylist || player == null) return;
+    final tracks = pad.tracks;
+    final done = Completer<void>();
+    v.arming = done.future;
+    try {
+      for (int attempt = 0; attempt < tracks.length; attempt++) {
+        final next = pad.shuffle ? _takeFromBag(v) : (v.track + 1) % tracks.length;
+        v.track = next;
+        try {
+          await player.setSource(DeviceFileSource(tracks[next]));
+          v.duration = await _trackDuration(player, tracks[next]);
+          break;
+        } catch (e) {
+          debugPrint('Playlist track ${tracks[next]} skipped: $e');
+        }
+      }
+    } finally {
+      v.arming = null;
+      done.complete();
+      notifyListeners();
     }
   }
 
@@ -349,6 +434,8 @@ class SampleEngine extends ChangeNotifier {
   Future<void> press(int i) async {
     final v = voice(i);
     if (v == null || v.missing || v.player == null) return;
+    final arming = v.arming;
+    if (arming != null) await arming; // next playlist track still loading
 
     switch (v.state) {
       case VoiceState.idle:
@@ -563,6 +650,7 @@ class SampleEngine extends ChangeNotifier {
         await p.setVolume(v.settings.volume);
       } catch (_) {}
     }
+    if (v.settings.isPlaylist) await _armNext(v);
   }
 
   void _onComplete(PadVoice v) {
@@ -572,6 +660,7 @@ class SampleEngine extends ChangeNotifier {
     v._clockReset();
     v.player?.setVolume(v.settings.volume);
     notifyListeners();
+    if (v.settings.isPlaylist) _armNext(v);
   }
 
   //----------------------------------------------------------------------------

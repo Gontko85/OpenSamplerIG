@@ -148,13 +148,38 @@ class PadTile extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (settings.looped && settings.hasSample)
+              if (settings.looped && settings.hasSample && !settings.isPlaylist)
                 Icon(Icons.repeat, size: 14, color: settings.textColor.withValues(alpha: 0.7)),
+              if (settings.isPlaylist) ...[
+                Icon(
+                  settings.shuffle ? Icons.shuffle : Icons.queue_music,
+                  size: 14,
+                  color: settings.textColor.withValues(alpha: 0.8),
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  '${(v?.track ?? 0) + 1}/${settings.tracks.length}',
+                  style: smallStyle.copyWith(fontSize: 11),
+                ),
+              ],
               if (state == VoiceState.paused) Icon(Icons.pause, size: 16, color: settings.textColor),
               if (v?.missing ?? false) const Icon(Icons.error, size: 16, color: Colors.redAccent),
             ],
           ),
         ),
+        // Playlist: the track playing (or the next one when idle).
+        if (settings.isPlaylist && v?.trackName != null)
+          Positioned(
+            left: 5,
+            right: 46,
+            bottom: 7,
+            child: Text(
+              '${active ? '' : '▶ '}${v!.trackName}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: smallStyle.copyWith(fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ),
         // Remaining time.
         if (showRemaining && active && v?.remaining != null)
           Positioned(

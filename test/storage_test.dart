@@ -30,7 +30,10 @@ void main() {
   }
 
   test('finds sounds used by no project, deletes only those (and temp files)', () async {
-    final a = sound('a.mp3', 1000), b = sound('b.mp3', 2000), c = sound('c.mp3', 3000), d = sound('d.mp3', 500);
+    final a = sound('a.mp3', 1000),
+        b = sound('b.mp3', 2000),
+        c = sound('c.mp3', 3000),
+        d = sound('d.mp3', 500);
     final part = sound('e.mp3.part', 700);
     await project('Match', ['a.mp3']).save();
     await project('temp', ['b.mp3']).save(); // the working project counts too

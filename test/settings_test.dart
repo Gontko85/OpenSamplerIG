@@ -11,7 +11,8 @@ void main() {
 
   test('reads a project saved by the original 2021 app', () {
     // Exact shape written by the original Open Sampler (no group / duration fields, volume 1.0).
-    const old = '{"name":"Match","x":2,"y":1,"padSettings":['
+    const old =
+        '{"name":"Match","x":2,"y":1,"padSettings":['
         '{"sample":"/data/user/0/eu.cherrytree.opensampler/cache/file_picker/intro.mp3","caption":"Intro",'
         '"color":4288585374,"textColor":4278190080,"looped":false,"volume":1.0,"long":true,"behaviour":"Stop"},'
         '{"sample":"","caption":"2","color":4288585374,"textColor":4278190080,"looped":true,"volume":0.5,"long":false,"behaviour":"Pause"}]}';

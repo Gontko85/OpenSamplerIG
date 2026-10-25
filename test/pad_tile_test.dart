@@ -53,18 +53,29 @@ void main() {
     items.add((PadSettings(7), null));
     add(pad('Défense !', const Color(0xFFFB8C00), group: 2), VoiceState.idle, 0, 4);
 
-    await tester.pumpWidget(MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(fontFamily: 'Roboto', useMaterial3: true),
-      home: Scaffold(
-        backgroundColor: const Color.fromARGB(255, 60, 60, 60),
-        appBar: AppBar(title: const Text('Match NM1'), actions: const [
-          Icon(Icons.lock_open), SizedBox(width: 16), Icon(Icons.volume_off_rounded), SizedBox(width: 16), Icon(Icons.more_vert), SizedBox(width: 8)
-        ]),
-        body: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Column(
-            children: List.generate(3, (r) => Expanded(
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(fontFamily: 'Roboto', useMaterial3: true),
+        home: Scaffold(
+          backgroundColor: const Color.fromARGB(255, 60, 60, 60),
+          appBar: AppBar(
+            title: const Text('Match NM1'),
+            actions: const [
+              Icon(Icons.lock_open),
+              SizedBox(width: 16),
+              Icon(Icons.volume_off_rounded),
+              SizedBox(width: 16),
+              Icon(Icons.more_vert),
+              SizedBox(width: 8),
+            ],
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Column(
+              children: List.generate(
+                3,
+                (r) => Expanded(
                   child: Row(
                     children: List.generate(3, (c) {
                       final it = items[r * 3 + c];
@@ -84,11 +95,13 @@ void main() {
                       );
                     }),
                   ),
-                )),
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/pads.png'));
   });

@@ -91,6 +91,73 @@ class Strings {
     'The grid applies to every page of the project.',
   );
 
+  // Playlists
+  String get playlistNone => _t('Un seul morceau', 'Single track');
+  String playlistSummary(int n, bool shuffle) => _t(
+    'Playlist : $n morceaux, ${shuffle ? 'au hasard' : 'dans l\'ordre'}',
+    'Playlist: $n tracks, ${shuffle ? 'random' : 'in order'}',
+  );
+  String get playlistCreate => _t('Ajouter des morceaux…', 'Add tracks…');
+  String get playlistManage => _t('Gérer…', 'Manage…');
+  String playlistTitle(String caption) => _t('Playlist « $caption »', 'Playlist "$caption"');
+  String get playlistAdd => _t('Ajouter des morceaux', 'Add tracks');
+  String get playlistInOrder => _t('Dans l\'ordre', 'In order');
+  String get playlistShuffle => _t('Au hasard', 'Random');
+  String get playlistInOrderHint => _t(
+    'Chaque appui sur la touche joue le morceau suivant de la liste, puis on recommence au premier. Faites glisser ≡ pour changer l\'ordre.',
+    'Each press plays the next track of the list, then it starts again from the first. Drag ≡ to reorder.',
+  );
+  String get playlistShuffleHint => _t(
+    'Chaque appui joue un morceau au hasard, sans jamais répéter un morceau avant que tous aient été joués.',
+    'Each press plays a random track, never repeating one before all were played.',
+  );
+  String get playlistEmpty => _t(
+    'Aucun morceau.\nAjoutez-en avec le bouton ci-dessous.',
+    'No track.\nAdd some with the button below.',
+  );
+
+  // Match rundowns ("conducteurs")
+  String get rundowns => _t('Conducteurs de match', 'Match rundowns');
+  String get rundownShort => _t('Conducteur', 'Rundown');
+  String get rundownToggle => _t('Afficher / masquer le conducteur', 'Show / hide the rundown');
+  String get rundownNew => _t('Nouveau conducteur', 'New rundown');
+  String get rundownNamePrompt => _t('Nom du conducteur', 'Rundown name');
+  String get rundownDefaultName => _t('Match', 'Match');
+  String get rundownsEmpty => _t(
+    'Aucun conducteur.\nUn conducteur est la liste des sons d\'un match, dans l\'ordre : un gros bouton joue le suivant.',
+    'No rundown.\nA rundown is the list of the sounds of a match, in order: one big button plays the next one.',
+  );
+  String rundownSteps(int n) => _t('$n étape${n > 1 ? 's' : ''}', '$n step${n > 1 ? 's' : ''}');
+  String get rename => _t('Renommer', 'Rename');
+  String get duplicate => _t('Dupliquer', 'Duplicate');
+  String get delete => _t('Supprimer', 'Delete');
+  String rundownCopyName(String name) => _t('$name (copie)', '$name (copy)');
+  String rundownDeleteConfirm(String name) => _t(
+    'Supprimer le conducteur « $name » ? Les sons ne sont pas supprimés.',
+    'Delete the rundown "$name"? The sounds are kept.',
+  );
+  String get rundownAddStep => _t('Ajouter une étape', 'Add a step');
+  String get rundownPickPad => _t('Touche à jouer', 'Pad to play');
+  String get rundownStepsEmpty => _t(
+    'Aucune étape.\nAjoutez les touches dans l\'ordre du match avec le bouton ci-dessous.',
+    'No step.\nAdd the pads in match order with the button below.',
+  );
+  String get rundownNote => _t('Note (facultative)', 'Note (optional)');
+  String get rundownNoteHint => _t('ex. : au coup de sifflet', 'e.g. at the whistle');
+  String get rundownEditNote => _t('Modifier la note', 'Edit note');
+  String get rundownMissingPad => _t('touche supprimée', 'pad deleted');
+  String get rundownNext => _t('À suivre', 'Up next');
+  String get rundownPlayed => _t('Joué', 'Played');
+  String get rundownFinished => _t('Conducteur terminé', 'Rundown finished');
+  String get rundownRestart => _t('Recommencer', 'Restart');
+  String get rundownBack => _t('Étape précédente', 'Previous step');
+  String get rundownSkip => _t('Passer cette étape', 'Skip this step');
+  String get rundownList => _t('Toutes les étapes', 'All steps');
+  String get rundownEdit => _t('Modifier le conducteur', 'Edit the rundown');
+  String get rundownNoneYet => _t('Aucun conducteur : créez-en un', 'No rundown: create one');
+  String get rundownCreate => _t('Créer', 'Create');
+  String rundownPage(String page) => _t('page $page', 'page $page');
+
   // Now playing / recent
   String get nowPlaying => _t('En cours', 'Now playing');
   String get recentSounds => _t('Sons récents', 'Recent sounds');
@@ -335,6 +402,20 @@ class Strings {
             '',
             'Les pads d\'un même groupe (A, B, C ou D) ne jouent jamais ensemble : en lancer un baisse puis arrête les autres. Idéal pour les musiques de fond.',
           ),
+          ('Playlist (plusieurs morceaux sur une touche)', null),
+          (
+            '',
+            'Dans les réglages d\'une touche, « Ajouter des morceaux… » en fait une playlist : chaque appui joue le morceau suivant, dans l\'ordre ou au hasard (sans répétition avant que tous aient été joués). Le morceau suivant est préparé à l\'avance pour partir sans délai. La touche affiche le numéro et le nom du morceau.',
+          ),
+          ('Conducteur de match', null),
+          (
+            '',
+            'Menu > Conducteurs de match : créez la liste des sons d\'un match dans l\'ordre (une étape = une touche + une note facultative, ex. « au coup de sifflet »). Plusieurs conducteurs possibles (match, mi-temps, Cheers…).',
+          ),
+          (
+            '',
+            'L\'icône ☰▶ en haut affiche le conducteur au-dessus de la grille : le gros bouton ▶ joue l\'étape « À suivre » et passe à la suivante, ◀ revient en arrière, ⏭ saute une étape, ☰ montre toutes les étapes (un appui pour y aller). Fonctionne aussi en mode scène. Les étapes suivent leurs touches même si on les déplace ou les change de page.',
+          ),
           ('Rechercher un son', null),
           (
             '',
@@ -421,6 +502,20 @@ class Strings {
           (
             '',
             'Pads in the same group (A, B, C or D) never play together: starting one fades out the others. Ideal for background music.',
+          ),
+          ('Playlist (several tracks on one pad)', null),
+          (
+            '',
+            'In a pad\'s settings, "Add tracks…" turns it into a playlist: each press plays the next track, in order or random (no repeat before all were played). The next track is prepared in advance so it starts at once. The pad shows the track number and name.',
+          ),
+          ('Match rundown', null),
+          (
+            '',
+            'Menu > Match rundowns: build the list of the sounds of a match, in order (a step = a pad + an optional note, e.g. "at the whistle"). You can have several rundowns (match, half-time, cheerleaders…).',
+          ),
+          (
+            '',
+            'The ☰▶ icon at the top shows the rundown above the grid: the big ▶ button plays the "Up next" step and moves on, ◀ goes back, ⏭ skips a step, ☰ shows all steps (tap one to jump to it). Works in stage mode too. Steps follow their pads even when pads are moved or put on another page.',
           ),
           ('Search a sound', null),
           (

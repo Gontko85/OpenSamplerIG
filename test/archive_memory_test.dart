@@ -51,7 +51,9 @@ void main() {
     expect(File(imported.padSettings[59].sample).readAsBytesSync()[0], 59);
 
     // ignore: avoid_print
-    print('zip: $zipSize MB · peak RSS before $before MB, after export $afterExport MB, after import $afterImport MB');
+    print(
+      'zip: $zipSize MB · peak RSS before $before MB, after export $afterExport MB, after import $afterImport MB',
+    );
     expect(afterExport - before, lessThan(120), reason: 'export must not load the project in memory');
     expect(afterImport - before, lessThan(120), reason: 'import must not load the project in memory');
     root.deleteSync(recursive: true);

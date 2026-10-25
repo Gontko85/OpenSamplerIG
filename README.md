@@ -4,6 +4,17 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.5.0
+
+- **Conducteur de match** (Menu > Conducteurs de match) : la liste des sons d'un match dans l'ordre,
+  chaque étape = une touche + une note facultative (« au coup de sifflet »). L'icône ☰▶ affiche au-dessus
+  de la grille un gros bouton **▶ À suivre** (à la couleur de la touche) qui joue l'étape et passe à la
+  suivante ; ◀ revenir, ⏭ passer, liste des étapes pour sauter. Plusieurs conducteurs par projet, utilisable
+  en mode scène ; les étapes suivent leurs touches même déplacées ou changées de page.
+- **Pad « playlist »** : plusieurs morceaux sur une touche (Réglages du pad > Ajouter des morceaux…),
+  joués dans l'ordre ou au hasard sans répétition ; le morceau suivant est préparé d'avance.
+  La touche affiche le numéro et le nom du morceau. Export/import et nettoyage du stockage en tiennent compte.
+
 ## Nouveautés de la v2.4.0
 
 - **Bandeau « En cours »** en bas : tous les sons qui jouent (toutes pages), temps restant, arrêt d'un
@@ -108,6 +119,9 @@ ne doivent jamais être poussés sur le dépôt.
 | `lib/pad_screen.dart` | Écran principal (grille, menu, mode scène) |
 | `lib/pad_tile.dart` | Rendu d'un pad |
 | `lib/pad_settings_screen.dart` | Réglages d'un pad |
+| `lib/playlist_screen.dart` | Morceaux d'un pad playlist |
+| `lib/rundown_screen.dart` | Conducteurs de match (liste, étapes) |
+| `lib/pad_picker.dart` | Choix d'une touche sur n'importe quelle page |
 | `lib/settings_screen.dart` | Réglages du projet et globaux |
 | `lib/project_archive.dart` | Export / import d'un projet (.zip) |
 | `lib/l10n.dart` | Textes de l'interface FR / EN |

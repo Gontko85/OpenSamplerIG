@@ -60,12 +60,25 @@ class PadSettings {
   /// Cached sample duration in milliseconds (0 = unknown).
   int durationMs = 0;
 
+  /// Stable identity of the pad (kept when it moves; used by the match rundowns).
+  String id = newPadId();
+
+  /// Playlist: more tracks after [sample]. Each press plays the next one.
+  List<String> extraTracks = [];
+
+  /// Playlist order: false = in order, true = random (no repeat before all were played).
+  bool shuffle = false;
+
   PadSettings(int index) {
     caption = "${index + 1}";
   }
 
+  /// Exact copy, same identity (used when the whole project is copied).
   PadSettings.copy(PadSettings s)
-    : sample = s.sample,
+    : id = s.id,
+      extraTracks = List.of(s.extraTracks),
+      shuffle = s.shuffle,
+      sample = s.sample,
       caption = s.caption,
       color = s.color.withAlpha(255),
       textColor = s.textColor.withAlpha(255),
@@ -76,7 +89,17 @@ class PadSettings {
       group = s.group,
       durationMs = s.durationMs;
 
+  /// Copy with a new identity (a second, independent pad).
+  PadSettings duplicate() => PadSettings.copy(this)..id = newPadId();
+
   PadSettings.fromJson(Map<String, dynamic> map) {
+    final String? savedId = map["id"] as String?;
+    if (savedId != null && savedId.isNotEmpty) id = savedId;
+    extraTracks = [
+      for (final t in (map["tracks"] as List<dynamic>? ?? const []))
+        if (t is String && t.isNotEmpty) t,
+    ];
+    shuffle = (map["shuffle"] as bool?) ?? false;
     sample = (map["sample"] as String?) ?? "";
     caption = (map["caption"] as String?) ?? "";
     final int? colorVal = map["color"] as int?;
@@ -102,9 +125,111 @@ class PadSettings {
     "behaviour": pressBehaviourToString(behaviour),
     "group": group,
     "durationMs": durationMs,
+    "id": id,
+    if (extraTracks.isNotEmpty) "tracks": extraTracks,
+    if (shuffle) "shuffle": shuffle,
   };
 
   bool get hasSample => sample.isNotEmpty;
+
+  /// Every sound file of the pad (one, or all the tracks of a playlist).
+  List<String> get tracks => hasSample ? [sample, ...extraTracks] : const [];
+
+  bool get isPlaylist => hasSample && extraTracks.isNotEmpty;
+
+  /// Removes the sound(s): back to a blank pad.
+  void clearSound() {
+    sample = "";
+    extraTracks = [];
+    shuffle = false;
+    durationMs = 0;
+  }
+}
+
+int _idCounter = 0;
+
+/// Short unique id, e.g. "lq3k9x-4f".
+String newPadId() =>
+    '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-${(_idCounter++ & 0xFFF).toRadixString(36)}';
+
+//==============================================================================
+
+/// One step of a match rundown: a pad to play, and an optional note.
+class RundownStep {
+  String padId;
+  String note;
+
+  /// Pad name when the step was created / last seen (shown if the pad is gone).
+  String caption;
+
+  RundownStep(this.padId, {this.note = '', this.caption = ''});
+
+  RundownStep.copy(RundownStep s) : padId = s.padId, note = s.note, caption = s.caption;
+
+  factory RundownStep.fromJson(Map<String, dynamic> m) => RundownStep(
+    (m['pad'] as String?) ?? '',
+    note: (m['note'] as String?) ?? '',
+    caption: (m['caption'] as String?) ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {'pad': padId, if (note.isNotEmpty) 'note': note, 'caption': caption};
+}
+
+/// A match rundown ("conducteur"): the sounds of a match, in order.
+class Rundown {
+  String name;
+  List<RundownStep> steps;
+
+  /// Index of the next step to play (steps.length = finished).
+  int position;
+
+  Rundown(this.name, {List<RundownStep>? steps, this.position = 0}) : steps = steps ?? [];
+
+  Rundown.copy(Rundown r)
+    : name = r.name,
+      steps = r.steps.map(RundownStep.copy).toList(),
+      position = r.position;
+
+  factory Rundown.fromJson(Map<String, dynamic> m) {
+    final r = Rundown(
+      (m['name'] as String?) ?? '',
+      steps: [
+        for (final s in (m['steps'] as List<dynamic>? ?? const []))
+          if (s is Map<String, dynamic>) RundownStep.fromJson(s),
+      ],
+    );
+    r.position = ((m['position'] as num?) ?? 0).toInt().clamp(0, r.steps.length);
+    return r;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'position': position,
+    'steps': steps.map((s) => s.toJson()).toList(),
+  };
+
+  bool get finished => position >= steps.length;
+}
+
+/// A step of [rundown] resolved against the pads of [project].
+extension RundownResolve on Settings {
+  /// Global pad index of [step], or -1 when its pad was deleted / emptied.
+  int padIndexOfStep(RundownStep step) {
+    final int i = indexOfPadId(step.padId);
+    return i >= 0 && padSettings[i].hasSample ? i : -1;
+  }
+
+  /// Current pad name (kept in [RundownStep.caption] for when the pad disappears).
+  String stepCaption(RundownStep step) {
+    final int i = indexOfPadId(step.padId);
+    if (i >= 0) {
+      final c = padSettings[i].caption.trim();
+      if (c.isNotEmpty) step.caption = c;
+    }
+    return step.caption;
+  }
+
+  Rundown? get rundown => rundowns.isEmpty ? null : rundowns[currentRundown.clamp(0, rundowns.length - 1)];
 }
 
 //==============================================================================
@@ -129,6 +254,12 @@ class Settings {
   /// Page shown when the project was last saved.
   int currentPage = 0;
 
+  /// Match rundowns ("conducteurs") of the project.
+  List<Rundown> rundowns = [];
+
+  /// Rundown selected in the rundown panel.
+  int currentRundown = 0;
+
   /// Grid size the flat list is currently laid out with (see [validate]).
   int _layoutN;
 
@@ -146,6 +277,8 @@ class Settings {
       padSettings = s.padSettings.map((p) => PadSettings.copy(p)).toList(),
       pageNames = List.of(s.pageNames),
       currentPage = s.currentPage,
+      rundowns = s.rundowns.map(Rundown.copy).toList(),
+      currentRundown = s.currentRundown,
       _layoutN = s._layoutN;
 
   factory Settings.fromJson(File file, String json) {
@@ -177,6 +310,14 @@ class Settings {
       s.padSettings = readPads(map['padSettings'] as List<dynamic>?);
     }
     s.currentPage = ((map['currentPage'] as num?) ?? 0).toInt().clamp(0, s.pageCount - 1);
+    s.rundowns = [
+      for (final r in (map['rundowns'] as List<dynamic>? ?? const []))
+        if (r is Map<String, dynamic>) Rundown.fromJson(r),
+    ];
+    s.currentRundown = ((map['currentRundown'] as num?) ?? 0).toInt().clamp(
+      0,
+      s.rundowns.isEmpty ? 0 : s.rundowns.length - 1,
+    );
     return s;
   }
 
@@ -185,6 +326,8 @@ class Settings {
     'x': x,
     'y': y,
     'currentPage': currentPage,
+    if (rundowns.isNotEmpty) 'rundowns': rundowns.map((r) => r.toJson()).toList(),
+    if (rundowns.isNotEmpty) 'currentRundown': currentRundown,
     'pages': List.generate(
       pageCount,
       (p) => {'name': pageNames[p], 'padSettings': padsOfPage(p).map((pad) => pad.toJson()).toList()},
@@ -221,7 +364,7 @@ class Settings {
 
   /// Adds a copy of [page] right after it and returns the new page index.
   int duplicatePage(int page, String name) {
-    final copy = padsOfPage(page).map((p) => PadSettings.copy(p)).toList();
+    final copy = padsOfPage(page).map((p) => p.duplicate()).toList();
     pageNames.insert(page + 1, name);
     padSettings.insertAll((page + 1) * padsPerPage, copy);
     return page + 1;
@@ -245,6 +388,9 @@ class Settings {
     padSettings.insertAll(target * padsPerPage, pads);
   }
 
+  /// Index of the pad with this identity, or -1.
+  int indexOfPadId(String id) => padSettings.indexWhere((p) => p.id == id);
+
   /// Indexes of the empty pads (no sound) from [page] to the last page, in order.
   List<int> emptySlotsFrom(int page) => [
     for (int i = page * padsPerPage; i < padSettings.length; i++)
@@ -260,9 +406,9 @@ class Settings {
     for (int i = 0; i < padSettings.length; i++) {
       final pad = padSettings[i];
       if (!pad.hasSample && int.tryParse(pad.caption.trim()) != null) continue; // blank pad "12"
-      final file = pad.hasSample
-          ? pad.sample.split(RegExp(r'[\\/]')).last.replaceFirst(RegExp(r'\.[^.]*$'), '')
-          : '';
+      final file = pad.tracks
+          .map((t) => t.split(RegExp(r'[\\/]')).last.replaceFirst(RegExp(r'\.[^.]*$'), ''))
+          .join(' ');
       if (foldText(pad.caption).contains(q) || foldText(file).contains(q)) found.add(i);
     }
     return found;
@@ -338,6 +484,11 @@ class GlobalPrefs {
   static const String stageLockKey = "stageLock";
   static const String showNowPlayingKey = "showNowPlaying";
   static const String showRecentKey = "showRecent";
+  static const String showRundownKey = "showRundown";
+
+  /// Rundown panel shown above the grid.
+  static bool get showRundown => preferences.getBool(showRundownKey) ?? false;
+  static set showRundown(bool v) => preferences.setBool(showRundownKey, v);
 
   static bool get showNowPlaying => preferences.getBool(showNowPlayingKey) ?? true;
   static set showNowPlaying(bool v) => preferences.setBool(showNowPlayingKey, v);

@@ -43,25 +43,36 @@ class ProjectArchive {
     final Map<String, String> entryForPath = {};
     final Set<String> usedNames = {};
 
-    // 1. Decide the entry name of every sound (and drop missing files).
+    // 1. Decide the entry name of every sound (and drop missing files),
+    //    including all the tracks of playlist pads.
+    Future<String?> entryFor(String path) async {
+      final known = entryForPath[path];
+      if (known != null) return known;
+      if (!await File(path).exists()) return null;
+      // Unique entry name, even if two different files share a name.
+      String name = p.basename(path);
+      int n = 2;
+      while (usedNames.contains(name)) {
+        name = '${p.basenameWithoutExtension(path)}_$n${p.extension(path)}';
+        n++;
+      }
+      usedNames.add(name);
+      return entryForPath[path] = '$samplesDir$name';
+    }
+
     for (final pad in copy.padSettings) {
       if (!pad.hasSample) continue;
-      if (!entryForPath.containsKey(pad.sample)) {
-        if (!await File(pad.sample).exists()) {
-          pad.sample = "";
-          continue;
-        }
-        // Unique entry name, even if two different files share a name.
-        String name = p.basename(pad.sample);
-        int n = 2;
-        while (usedNames.contains(name)) {
-          name = '${p.basenameWithoutExtension(pad.sample)}_$n${p.extension(pad.sample)}';
-          n++;
-        }
-        usedNames.add(name);
-        entryForPath[pad.sample] = '$samplesDir$name';
+      final List<String> tracks = [];
+      for (final t in pad.tracks) {
+        final e = await entryFor(t);
+        if (e != null) tracks.add(e);
       }
-      pad.sample = entryForPath[pad.sample]!;
+      if (tracks.isEmpty) {
+        pad.clearSound();
+        continue;
+      }
+      pad.sample = tracks.first;
+      pad.extraTracks = tracks.sublist(1);
     }
 
     // 2. Stream everything into the zip file, one sound at a time.
@@ -158,7 +169,16 @@ class ProjectArchive {
       settings.name = p.basenameWithoutExtension(target.path);
       for (final pad in settings.padSettings) {
         if (!pad.hasSample) continue;
-        pad.sample = storedFor[pad.sample] ?? "";
+        final tracks = [
+          for (final t in pad.tracks)
+            if (storedFor[t] != null) storedFor[t]!,
+        ];
+        if (tracks.isEmpty) {
+          pad.clearSound();
+        } else {
+          pad.sample = tracks.first;
+          pad.extraTracks = tracks.sublist(1);
+        }
       }
       await settings.save();
       return (settings, storedFor.length);

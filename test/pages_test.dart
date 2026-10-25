@@ -22,7 +22,8 @@ void main() {
 
   test('old single-page project opens as one page', () {
     final s = Settings.temp('Old', 2, 1);
-    final json = '{"name":"Old","x":2,"y":1,"padSettings":${'[${s.padSettings.map((p) => '{"caption":"x","sample":""}').join(',')}]'}}';
+    final json =
+        '{"name":"Old","x":2,"y":1,"padSettings":${'[${s.padSettings.map((p) => '{"caption":"x","sample":""}').join(',')}]'}}';
     final r = Settings.fromJson(File('o.json'), json);
     expect(r.pageCount, 1);
     expect(r.padSettings.length, 2);
@@ -116,4 +117,3 @@ void main() {
     expect(foldText('Àçéïôù ß'), 'aceiou ss');
   });
 }
-

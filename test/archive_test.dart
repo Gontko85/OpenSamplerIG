@@ -22,10 +22,12 @@ void main() {
       ..sample = b.path
       ..caption = 'Buzzer';
     s.padSettings[2]
-      ..sample = a.path // same file used twice -> stored once
+      ..sample = a
+          .path // same file used twice -> stored once
       ..caption = 'Intro bis';
     s.padSettings[3]
-      ..sample = '${src.path}/missing.mp3' // missing file -> pad emptied, export still works
+      ..sample =
+          '${src.path}/missing.mp3' // missing file -> pad emptied, export still works
       ..caption = 'Perdu';
 
     final zip = '${src.path}/export.zip';
@@ -52,7 +54,8 @@ void main() {
   test('rejects a random file / a zip without project', () async {
     documentDirectory = Directory.systemTemp.createTempSync('os_arch2');
     await expectLater(ProjectArchive.importFromFile('/etc/hostname'), throwsA(isA<FormatException>()));
-    final noProject = File('${documentDirectory.path}/x.zip')..writeAsBytesSync([80, 75, 5, 6, ...List.filled(18, 0)]);
+    final noProject = File('${documentDirectory.path}/x.zip')
+      ..writeAsBytesSync([80, 75, 5, 6, ...List.filled(18, 0)]);
     await expectLater(ProjectArchive.importFromFile(noProject.path), throwsA(isA<FormatException>()));
   });
 }

@@ -40,6 +40,7 @@ enum MenuAction {
   openProject,
   bulkImport,
   rundowns,
+  compact,
   exportProject,
   importProject,
   settings,
@@ -94,6 +95,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     super.initState();
     _settings = Settings.copy(widget.initialSettings);
     _engine.fadeMs = GlobalPrefs.fadeMs;
+    _engine.duckLevel = GlobalPrefs.duckLevel / 100;
     _engine.addListener(_onEngineChanged);
     _ticker = createTicker(_onTick);
     _applyWakelock();
@@ -215,6 +217,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
         after.sample != before.sample ||
         !listEquals(after.tracks, before.tracks) ||
         after.shuffle != before.shuffle ||
+        after.startMs != before.startMs ||
+        after.endMs != before.endMs ||
         after.looped != before.looped ||
         after.long != before.long ||
         after.volume != before.volume;
@@ -334,19 +338,27 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     }
   }
 
-  Widget _buildPageTabs() {
+  /// Compact display: chosen in the settings, or automatic on phones.
+  static bool _isCompact(BuildContext context) => switch (GlobalPrefs.compactMode) {
+    CompactMode.on => true,
+    CompactMode.off => false,
+    CompactMode.auto => MediaQuery.sizeOf(context).shortestSide < 600,
+  };
+
+  Widget _buildPageTabs(bool compact) {
     final n = _settings.padsPerPage;
     return Container(
-      height: 46,
+      height: compact ? 36 : 46,
       color: const Color(0xFF2B2B2B),
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: compact ? 4 : 6),
         children: [
           for (int p = 0; p < _settings.pageCount; p++)
             Padding(
               padding: const EdgeInsets.only(right: 6),
               child: _PageTab(
+                compact: compact,
                 label: _settings.pageLabel(p, S.pageN),
                 selected: p == _page,
                 playing: _engine.anyActiveIn(p * n, (p + 1) * n),
@@ -670,7 +682,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     if (k != null) _moveRundown(k);
   }
 
-  Widget _buildRundown() {
+  Widget _buildRundown(bool compact) {
     const bg = Color(0xFF1F2A1F);
     final r = _settings.rundown;
     if (r == null) {
@@ -703,7 +715,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             style: FilledButton.styleFrom(
               backgroundColor: Colors.grey.shade800,
               foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(56),
+              minimumSize: Size.fromHeight(compact ? 44 : 56),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: n > 0 ? () => _moveRundown(0) : null,
@@ -714,8 +726,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             style: FilledButton.styleFrom(
               backgroundColor: padNext?.color ?? Colors.grey.shade800,
               foregroundColor: padNext?.textColor ?? Colors.white,
-              minimumSize: const Size.fromHeight(56),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.fromHeight(compact ? 44 : 56),
+              padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12, vertical: compact ? 2 : 6),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
                 side: const BorderSide(color: Colors.white, width: 2),
@@ -724,8 +736,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             onPressed: _playNextStep,
             child: Row(
               children: [
-                const Icon(Icons.play_arrow, size: 34),
-                const SizedBox(width: 8),
+                Icon(Icons.play_arrow, size: compact ? 28 : 34),
+                SizedBox(width: compact ? 4 : 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -736,7 +748,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: compact ? 17 : 20,
                           fontWeight: FontWeight.bold,
                           decoration: padNext == null ? TextDecoration.lineThrough : null,
                         ),
@@ -746,7 +758,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                           padNext == null ? S.rundownMissingPad : next.note,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: compact ? 12 : 13),
                         ),
                     ],
                   ),
@@ -754,6 +766,67 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
               ],
             ),
           );
+
+    Widget selector(Widget child) => PopupMenuButton<int>(
+      tooltip: S.rundowns,
+      onSelected: (k) => k < 0 ? _goToRundowns() : _selectRundown(k),
+      itemBuilder: (_) => [
+        for (int k = 0; k < _settings.rundowns.length; k++)
+          CheckedPopupMenuItem(
+            value: k,
+            checked: k == _settings.currentRundown,
+            child: Text(_settings.rundowns[k].name),
+          ),
+        if (!_stageLock) ...[const PopupMenuDivider(), PopupMenuItem(value: -1, child: Text(S.rundowns))],
+      ],
+      child: child,
+    );
+    final String counter = '${(r.position + (r.finished ? 0 : 1)).clamp(0, n)}/$n';
+
+    // Compact: a single row (counter / rundown choice, back, big button, skip, list).
+    if (compact) {
+      IconButton tiny(String tip, IconData icon, VoidCallback? onPressed) => IconButton(
+        tooltip: tip,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 34, minHeight: 40),
+        color: Colors.white,
+        onPressed: onPressed,
+        icon: Icon(icon),
+      );
+      return Container(
+        color: bg,
+        padding: const EdgeInsets.fromLTRB(2, 3, 2, 3),
+        child: Row(
+          children: [
+            selector(
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(counter, style: small),
+                    const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 18),
+                  ],
+                ),
+              ),
+            ),
+            tiny(
+              S.rundownBack,
+              Icons.skip_previous,
+              r.position > 0 ? () => _moveRundown(r.position - 1) : null,
+            ),
+            Expanded(
+              child: n == 0
+                  ? Text(S.rundownStepsEmpty.split('\n').first, style: small, textAlign: TextAlign.center)
+                  : bigButton,
+            ),
+            tiny(S.rundownSkip, Icons.skip_next, next != null ? () => _moveRundown(r.position + 1) : null),
+            tiny(S.rundownList, Icons.format_list_numbered, n > 0 ? _showRundownSteps : null),
+          ],
+        ),
+      );
+    }
 
     return Container(
       color: bg,
@@ -765,22 +838,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
           Row(
             children: [
               // Rundown selector.
-              PopupMenuButton<int>(
-                tooltip: S.rundowns,
-                onSelected: (k) => k < 0 ? _goToRundowns() : _selectRundown(k),
-                itemBuilder: (_) => [
-                  for (int k = 0; k < _settings.rundowns.length; k++)
-                    CheckedPopupMenuItem(
-                      value: k,
-                      checked: k == _settings.currentRundown,
-                      child: Text(_settings.rundowns[k].name),
-                    ),
-                  if (!_stageLock) ...[
-                    const PopupMenuDivider(),
-                    PopupMenuItem(value: -1, child: Text(S.rundowns)),
-                  ],
-                ],
-                child: Padding(
+              selector(
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -799,7 +858,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                   ),
                 ),
               ),
-              Text('${(r.position + (r.finished ? 0 : 1)).clamp(0, n)}/$n', style: small),
+              Text(counter, style: small),
               const Spacer(),
               IconButton(
                 tooltip: S.rundownBack,
@@ -940,6 +999,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     _settings.validate();
     await _settings.save();
     _engine.fadeMs = GlobalPrefs.fadeMs;
+    _engine.duckLevel = GlobalPrefs.duckLevel / 100;
     _applyWakelock();
 
     if (oldX != _settings.x || oldY != _settings.y) {
@@ -1259,6 +1319,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       case MenuAction.rundowns:
         _goToRundowns();
         break;
+      case MenuAction.compact:
+        setState(() => GlobalPrefs.compactMode = _isCompact(context) ? CompactMode.off : CompactMode.on);
+        break;
       case MenuAction.exportProject:
         _goToExport();
         break;
@@ -1284,7 +1347,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     final String prefFont = GlobalPrefs.fontSize;
     final double? fontSize = prefFont != "Default" ? double.tryParse(prefFont) : null;
     final bool showRemaining = GlobalPrefs.showRemaining;
-    const double spacing = 4;
+    final bool compact = _isCompact(context);
+    final double spacing = compact ? 2 : 4;
+    final VisualDensity density = compact ? VisualDensity.compact : VisualDensity.standard;
     _refreshMatches();
     // Recent sounds that still exist in this project, as pad indexes.
     final List<int> recent = [
@@ -1295,28 +1360,36 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 60, 60, 60),
       appBar: AppBar(
-        titleSpacing: 12,
-        title: Text(_settings.name, overflow: TextOverflow.ellipsis, maxLines: 1),
+        titleSpacing: compact ? 8 : 12,
+        toolbarHeight: compact ? 48 : null,
+        // Compact: no project name, so that every button fits on a phone.
+        title: compact ? null : Text(_settings.name, overflow: TextOverflow.ellipsis, maxLines: 1),
         actions: [
           IconButton(
+            visualDensity: density,
             tooltip: S.search,
             icon: Icon(_searching ? Icons.search_off : Icons.search),
             onPressed: _searching ? _closeSearch : _openSearch,
           ),
           IconButton(
+            visualDensity: density,
             tooltip: S.rundownToggle,
             icon: const Icon(Icons.playlist_play),
             color: _showRundown ? Colors.lightGreenAccent : null,
             onPressed: () => setState(() => GlobalPrefs.showRundown = _showRundown = !_showRundown),
           ),
+          if (GlobalPrefs.showDuck)
+            _DuckButton(ducked: _engine.ducked, compact: compact, onChanged: (on) => _engine.setDucked(on)),
           _StopButton(
             width: MediaQuery.sizeOf(context).width * 0.25,
+            height: compact ? 40 : 46,
             active: _engine.anyActive,
             fading: _engine.anyFading,
             onPressed: () => _engine.stopAll(),
           ),
           const SizedBox(width: 4),
           IconButton(
+            visualDensity: density,
             tooltip: _stageLock ? S.stageOnTooltip : S.stageOffTooltip,
             icon: Icon(_stageLock ? Icons.lock : Icons.lock_open),
             color: _stageLock ? Colors.amber : null,
@@ -1332,6 +1405,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                 const PopupMenuDivider(),
                 PopupMenuItem(value: MenuAction.bulkImport, child: Text(S.bulkImport)),
                 PopupMenuItem(value: MenuAction.rundowns, child: Text(S.rundowns)),
+                CheckedPopupMenuItem(value: MenuAction.compact, checked: compact, child: Text(S.compactMenu)),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: MenuAction.exportProject, child: Text(S.exportProject)),
                 PopupMenuItem(value: MenuAction.importProject, child: Text(S.importProject)),
@@ -1348,11 +1422,11 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
           children: [
             // Page tabs (hidden in stage mode when the project has a single page).
             if (_searching) _buildSearchBar(),
-            if (_settings.pageCount > 1 || !_stageLock) _buildPageTabs(),
-            if (_showRundown) _buildRundown(),
+            if (_settings.pageCount > 1 || !_stageLock) _buildPageTabs(compact),
+            if (_showRundown) _buildRundown(compact),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(spacing),
+                padding: EdgeInsets.all(spacing),
                 child: Column(
                   children: List.generate(_settings.y, (row) {
                     return Expanded(
@@ -1361,7 +1435,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                           final int i = _settings.globalIndex(_page, row * _settings.x + col);
                           return Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.all(spacing / 2),
+                              padding: EdgeInsets.all(spacing / 2),
                               child: PadTile(
                                 // One identity per pad: switching page shows the new pads at once
                                 // (no colour fade from the pads of the previous page).
@@ -1384,8 +1458,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                 ),
               ),
             ),
-            if (GlobalPrefs.showNowPlaying && _engine.anyActive) _buildNowPlaying(),
-            if (GlobalPrefs.showRecent && recent.isNotEmpty) _buildRecent(recent),
+            // Compact mode keeps the whole height for the pads.
+            if (!compact && GlobalPrefs.showNowPlaying && _engine.anyActive) _buildNowPlaying(),
+            if (!compact && GlobalPrefs.showRecent && recent.isNotEmpty) _buildRecent(recent),
           ],
         ),
       ),
@@ -1402,8 +1477,10 @@ class _PageTab extends StatelessWidget {
   final bool playing;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final bool compact;
 
   const _PageTab({
+    this.compact = false,
     required this.label,
     required this.selected,
     required this.playing,
@@ -1422,7 +1499,7 @@ class _PageTab extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1442,7 +1519,7 @@ class _PageTab extends StatelessWidget {
                 style: TextStyle(
                   color: fg,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 15,
+                  fontSize: compact ? 14 : 15,
                 ),
               ),
             ],
@@ -1460,12 +1537,14 @@ class _PageTab extends StatelessWidget {
 /// Big red STOP button, easy to hit in a hurry.
 class _StopButton extends StatelessWidget {
   final double width;
+  final double height;
   final bool active;
   final bool fading;
   final VoidCallback onPressed;
 
   const _StopButton({
     required this.width,
+    this.height = 46,
     required this.active,
     required this.fading,
     required this.onPressed,
@@ -1481,7 +1560,7 @@ class _StopButton extends StatelessWidget {
       message: S.stopTooltip,
       child: SizedBox(
         width: width,
-        height: 46,
+        height: height,
         child: FilledButton.icon(
           style: FilledButton.styleFrom(
             backgroundColor: bg,
@@ -1494,6 +1573,63 @@ class _StopButton extends StatelessWidget {
           onPressed: onPressed,
           icon: Icon(fading ? Icons.flash_on : Icons.stop_rounded, size: 28),
           label: FittedBox(child: Text(fading ? S.cutNow : S.stop)),
+        ),
+      ),
+    );
+  }
+}
+
+//==============================================================================
+
+/// "Lower the music" for an announcement: a tap lowers / brings back,
+/// holding it lowers only while the finger stays on it.
+class _DuckButton extends StatefulWidget {
+  final bool ducked;
+  final bool compact;
+  final ValueChanged<bool> onChanged;
+
+  const _DuckButton({required this.ducked, required this.compact, required this.onChanged});
+
+  @override
+  State<_DuckButton> createState() => _DuckButtonState();
+}
+
+class _DuckButtonState extends State<_DuckButton> {
+  bool _holding = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool on = widget.ducked;
+    return Tooltip(
+      message: S.duckTooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => widget.onChanged(!on),
+        onLongPressStart: (_) {
+          _holding = true;
+          widget.onChanged(true);
+        },
+        onLongPressEnd: (_) {
+          if (_holding) widget.onChanged(false);
+          _holding = false;
+        },
+        onLongPressCancel: () {
+          if (_holding) widget.onChanged(false);
+          _holding = false;
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: EdgeInsets.symmetric(horizontal: widget.compact ? 2 : 4),
+          padding: EdgeInsets.all(widget.compact ? 6 : 8),
+          decoration: BoxDecoration(
+            color: on ? Colors.amber : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            on ? Icons.volume_down : Icons.campaign_outlined,
+            color: on ? Colors.black : null,
+            semanticLabel: S.duckTooltip,
+          ),
         ),
       ),
     );

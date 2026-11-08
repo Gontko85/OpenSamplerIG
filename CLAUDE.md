@@ -20,10 +20,14 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
 - v2.5.0 (livrée) : conducteur de match (Settings.rundowns, étapes = id stable de pad + note,
   panneau ▶ « À suivre » au-dessus de la grille, anti-rebond 400 ms) et pad playlist
   (PadSettings.extraTracks + shuffle, morceau suivant pré-chargé via _armNext, lecteur mediaPlayer).
-- En réserve (pas utiles à Ivan pour l'instant, à garder pour plus tard) : point de départ/fin d'un son,
-  fondu d'entrée par pad, clignotement du pad dans les dernières secondes, vibration au déclenchement,
-  code PIN pour quitter le mode scène, verrouillage de l'orientation, baisse auto de la musique
-  (ducking) pour pads prioritaires, copier une touche vers un autre projet.
+- v2.6.0 (livrée) : affichage compact (GlobalPrefs.compactMode auto = shortestSide < 600 : sans titre ni
+  barres du bas, onglets/conducteur resserrés), « Baisser la musique » (SampleEngine.setDucked, duckGain par
+  voix, rampe 300 ms, appui = bascule / maintien = momentané), début/fin d'un son (PadSettings.startMs/endMs,
+  force le lecteur mediaPlayer, boucle manuelle vers startMs, TrimScreen), copier une touche vers un autre projet.
+- En réserve : fondu d'entrée par pad, clignotement en fin de son, vibration, verrouillage de l'orientation,
+  baisse auto (ducking automatique) pour pads prioritaires.
+- Écarté par Ivan : code PIN du mode scène (un seul utilisateur), journal de diffusion SACEM (plus obligatoire),
+  sauvegarde auto vers Drive, durée totale du conducteur.
 - Déconseillé pour l'instant : fusion de pads, normalisation du volume, enregistrement micro,
     télécommande/pédale Bluetooth.
 
@@ -63,4 +67,5 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   d'où l'horloge interne dans `PadVoice` et la durée sondée/mise en cache (`durationMs`).
 - Ids de pads : `PadSettings.id` stable (copié par `copy`, nouveau via `duplicate()`), utilisé par les
   étapes de conducteur (`Settings.padIndexOfStep` → -1 si touche vide/supprimée).
+- Tests : les écrans de test font la taille d'un téléphone → screens_test force CompactMode.off dans setUpAll.
 - Compatibilité : les JSON de projet 2021 doivent rester lisibles (test/settings_test.dart).

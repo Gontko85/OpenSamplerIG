@@ -4,6 +4,16 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.6.0
+
+- **Affichage compact** (automatique sur téléphone, ou Réglages / Menu > Affichage compact) : sans nom de
+  projet ni barres du bas, onglets et conducteur resserrés — toute la place pour les touches.
+- **Baisser la musique** (bouton 📣 en haut) pour une annonce au micro : un appui baisse les sons en cours
+  (10 à 50 %, réglable), un autre les remonte ; maintenu, la musique reste baissée tant que le doigt est posé.
+- **Début et fin d'un son** (réglages de la touche > *Début / fin…*) : choisir où le son commence et s'arrête,
+  à l'écoute (« Ici ») ou au curseur, sans éditeur audio ni modification du fichier ; la boucle repart du début choisi.
+- **Copier une touche vers un autre projet** (réglages de la touche > icône dossier) : projet puis touche de destination.
+
 ## Nouveautés de la v2.5.0
 
 - **Conducteur de match** (Menu > Conducteurs de match) : la liste des sons d'un match dans l'ordre,
@@ -121,6 +131,8 @@ ne doivent jamais être poussés sur le dépôt.
 | `lib/pad_settings_screen.dart` | Réglages d'un pad |
 | `lib/playlist_screen.dart` | Morceaux d'un pad playlist |
 | `lib/rundown_screen.dart` | Conducteurs de match (liste, étapes) |
+| `lib/trim_screen.dart` | Début / fin d'un son |
+| `lib/copy_to_project.dart` | Copie d'une touche vers un autre projet |
 | `lib/pad_picker.dart` | Choix d'une touche sur n'importe quelle page |
 | `lib/settings_screen.dart` | Réglages du projet et globaux |
 | `lib/project_archive.dart` | Export / import d'un projet (.zip) |

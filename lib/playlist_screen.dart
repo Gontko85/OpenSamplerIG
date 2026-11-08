@@ -40,7 +40,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       pad.clearSound();
       return;
     }
-    if (pad.sample != _tracks.first) pad.durationMs = 0;
+    if (pad.sample != _tracks.first) {
+      pad.durationMs = 0;
+      pad.startMs = 0;
+      pad.endMs = 0;
+    }
     pad.sample = _tracks.first;
     pad.extraTracks = _tracks.sublist(1);
     pad.shuffle = _shuffle;

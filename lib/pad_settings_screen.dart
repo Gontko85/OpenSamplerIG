@@ -13,7 +13,9 @@ import 'package:path/path.dart' as p;
 import 'dialogs.dart';
 import 'l10n.dart';
 import 'pad_picker.dart';
+import 'copy_to_project.dart';
 import 'playlist_screen.dart';
+import 'trim_screen.dart';
 import 'sample_store.dart';
 import 'settings.dart';
 
@@ -83,6 +85,8 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
       final bool autoCaption = _captionIsAutomatic(oldSample);
       _pad.sample = stored;
       _pad.durationMs = 0;
+      _pad.startMs = 0; // a new sound: start / end points no longer apply
+      _pad.endMs = 0;
       _problem = null;
       if (autoCaption) {
         _pad.caption = p.basenameWithoutExtension(picked.name);
@@ -118,6 +122,25 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
     }
     await widget.project.save();
     if (mounted) setState(() {});
+  }
+
+  /// Low text buttons for the playlist / start-end rows (everything fits on a phone).
+  static final ButtonStyle _rowButton = TextButton.styleFrom(
+    minimumSize: const Size(0, 34),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+  );
+
+  Future<void> _openTrim() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => TrimScreen(_pad)));
+    await widget.project.save();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _copyToProject() async {
+    final String? name = await copyPadToProject(context, _pad, widget.project.file);
+    if (name == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(S.copiedToProject(name))));
   }
 
   Future<void> _customColor({required bool text}) async {
@@ -240,6 +263,11 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
             icon: const Icon(Icons.copy),
             onPressed: _pad.hasSample ? () => _arrange(copy: true) : null,
           ),
+          IconButton(
+            tooltip: S.copyToProject,
+            icon: const Icon(Icons.drive_file_move_outline),
+            onPressed: _pad.hasSample ? _copyToProject : null,
+          ),
         ],
       ),
       // Everything fits on one screen; scrolling only kicks in on very small phones.
@@ -337,9 +365,33 @@ class _PadSettingsScreenState extends State<PadSettingsScreen> {
                       ),
                     ),
                     TextButton(
+                      style: _rowButton,
                       onPressed: _openPlaylist,
                       child: Text(_pad.isPlaylist ? S.playlistManage : S.playlistCreate),
                     ),
+                  ],
+                ),
+
+              // 2c. Start / end point (single sounds).
+              if (_pad.hasSample && !_pad.isPlaylist)
+                Row(
+                  children: [
+                    const Icon(Icons.content_cut, size: 20),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _pad.isTrimmed
+                            ? S.trimSummary(
+                                formatTrimTime(_pad.startMs),
+                                _pad.endMs > 0
+                                    ? formatTrimTime(_pad.endMs)
+                                    : (_pad.durationMs > 0 ? formatTrimTime(_pad.durationMs) : '…'),
+                              )
+                            : S.trimWhole,
+                        style: _pad.isTrimmed ? null : TextStyle(color: theme.hintColor),
+                      ),
+                    ),
+                    TextButton(style: _rowButton, onPressed: _openTrim, child: Text(S.trimEdit)),
                   ],
                 ),
               gap,

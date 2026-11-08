@@ -44,6 +44,9 @@ const List<String> groupNames = ["None", "A", "B", "C", "D"];
 
 //==============================================================================
 
+/// Compact display for small screens.
+enum CompactMode { auto, on, off }
+
 class PadSettings {
   String sample = "";
   String caption = "";
@@ -69,6 +72,10 @@ class PadSettings {
   /// Playlist order: false = in order, true = random (no repeat before all were played).
   bool shuffle = false;
 
+  /// Trim: where the sound starts and ends in the file, in ms (0 = file start / file end).
+  int startMs = 0;
+  int endMs = 0;
+
   PadSettings(int index) {
     caption = "${index + 1}";
   }
@@ -78,6 +85,8 @@ class PadSettings {
     : id = s.id,
       extraTracks = List.of(s.extraTracks),
       shuffle = s.shuffle,
+      startMs = s.startMs,
+      endMs = s.endMs,
       sample = s.sample,
       caption = s.caption,
       color = s.color.withAlpha(255),
@@ -100,6 +109,9 @@ class PadSettings {
         if (t is String && t.isNotEmpty) t,
     ];
     shuffle = (map["shuffle"] as bool?) ?? false;
+    startMs = ((map["start"] as num?) ?? 0).toInt().clamp(0, 1 << 31);
+    endMs = ((map["end"] as num?) ?? 0).toInt().clamp(0, 1 << 31);
+    if (endMs > 0 && endMs <= startMs) endMs = 0;
     sample = (map["sample"] as String?) ?? "";
     caption = (map["caption"] as String?) ?? "";
     final int? colorVal = map["color"] as int?;
@@ -128,6 +140,8 @@ class PadSettings {
     "id": id,
     if (extraTracks.isNotEmpty) "tracks": extraTracks,
     if (shuffle) "shuffle": shuffle,
+    if (startMs > 0) "start": startMs,
+    if (endMs > 0) "end": endMs,
   };
 
   bool get hasSample => sample.isNotEmpty;
@@ -137,12 +151,24 @@ class PadSettings {
 
   bool get isPlaylist => hasSample && extraTracks.isNotEmpty;
 
+  /// A start or end point is set (single sounds only, playlists play whole tracks).
+  bool get isTrimmed => hasSample && !isPlaylist && (startMs > 0 || endMs > 0);
+
+  /// Length actually played, in ms (0 = unknown).
+  int get playedMs {
+    if (durationMs <= 0) return 0;
+    final int end = endMs > 0 && endMs < durationMs ? endMs : durationMs;
+    return (end - startMs).clamp(0, durationMs);
+  }
+
   /// Removes the sound(s): back to a blank pad.
   void clearSound() {
     sample = "";
     extraTracks = [];
     shuffle = false;
     durationMs = 0;
+    startMs = 0;
+    endMs = 0;
   }
 }
 
@@ -485,6 +511,22 @@ class GlobalPrefs {
   static const String showNowPlayingKey = "showNowPlaying";
   static const String showRecentKey = "showRecent";
   static const String showRundownKey = "showRundown";
+  static const String compactModeKey = "compactMode";
+  static const String duckLevelKey = "duckLevel";
+  static const String showDuckKey = "showDuck";
+
+  /// Compact display: auto (phones), on, off.
+  static CompactMode get compactMode =>
+      CompactMode.values.elementAtOrNull(preferences.getInt(compactModeKey) ?? 0) ?? CompactMode.auto;
+  static set compactMode(CompactMode v) => preferences.setInt(compactModeKey, v.index);
+
+  /// "Lower the music": volume kept, in percent.
+  static int get duckLevel => preferences.getInt(duckLevelKey) ?? 30;
+  static set duckLevel(int v) => preferences.setInt(duckLevelKey, v);
+
+  /// Show the "lower the music" button at the top.
+  static bool get showDuck => preferences.getBool(showDuckKey) ?? true;
+  static set showDuck(bool v) => preferences.setBool(showDuckKey, v);
 
   /// Rundown panel shown above the grid.
   static bool get showRundown => preferences.getBool(showRundownKey) ?? false;

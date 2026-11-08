@@ -75,7 +75,17 @@ class PadVoice {
   }
 
   /// Media player (long sounds, playlists) or SoundPool (short sounds).
-  bool get usesMediaPlayer => settings.long || settings.isPlaylist;
+  bool get usesMediaPlayer => settings.long || settings.isPlaylist || settings.isTrimmed;
+
+  /// Where playback starts in the file (trimmed sounds).
+  Duration get startAt => Duration(milliseconds: settings.isTrimmed ? settings.startMs : 0);
+
+  /// "Lower the music": 1 = normal, down to the duck level while lowered.
+  double duckGain = 1.0;
+  Timer? _duckTimer;
+
+  /// Volume the pad plays at right now (its own volume, lowered or not).
+  double get liveVolume => settings.volume * duckGain;
   bool get isLowLatency => !usesMediaPlayer;
   bool get isActive => state == VoiceState.playing || state == VoiceState.fading;
 
@@ -143,8 +153,15 @@ class PadVoice {
     _fadeTimer = null;
   }
 
+  void _resetDuck() {
+    _duckTimer?.cancel();
+    _duckTimer = null;
+    duckGain = 1.0;
+  }
+
   Future<void> dispose() async {
     _cancelFade();
+    _duckTimer?.cancel();
     for (final s in _subs) {
       await s.cancel();
     }
@@ -310,7 +327,10 @@ class SampleEngine extends ChangeNotifier {
     v.player = player;
     final bool media = v.usesMediaPlayer;
     await player.setPlayerMode(media ? PlayerMode.mediaPlayer : PlayerMode.lowLatency);
-    await player.setReleaseMode(pad.looped && !pad.isPlaylist ? ReleaseMode.loop : ReleaseMode.stop);
+    // Trimmed loops are looped by hand (back to the start point, not the file start).
+    await player.setReleaseMode(
+      pad.looped && !pad.isPlaylist && !pad.isTrimmed ? ReleaseMode.loop : ReleaseMode.stop,
+    );
     await player.setVolume(pad.volume);
 
     if (pad.isPlaylist) {
@@ -340,6 +360,8 @@ class SampleEngine extends ChangeNotifier {
         settingsDirty = true;
       }
     }
+    // Trimmed: progress and remaining time cover the part played only.
+    if (pad.isTrimmed && pad.playedMs > 0) v.duration = Duration(milliseconds: pad.playedMs);
 
     if (media) {
       v._subs.add(player.onPlayerComplete.listen((_) => _onComplete(v)));
@@ -347,7 +369,9 @@ class SampleEngine extends ChangeNotifier {
         player.onPositionChanged.listen((pos) {
           if (v.state == VoiceState.playing || v.state == VoiceState.fading) {
             if (DateTime.now().isAfter(v._ignorePositionUntil)) {
-              v._clockRestart(pos);
+              final rel = pos - v.startAt;
+              v._clockRestart(rel.isNegative ? Duration.zero : rel);
+              _checkTrimEnd(v);
             }
           }
         }),
@@ -445,7 +469,7 @@ class SampleEngine extends ChangeNotifier {
       case VoiceState.fading:
         // Tapped again while it was fading out: bring it back from the start.
         v._cancelFade();
-        await v.player!.setVolume(v.settings.volume);
+        await v.player!.setVolume(v.liveVolume);
         await _restart(v);
         break;
 
@@ -533,6 +557,10 @@ class SampleEngine extends ChangeNotifier {
     bool changed = false;
     for (final v in _voices) {
       if (v == null || !v.isActive) continue;
+      if (v.settings.isTrimmed && _checkTrimEnd(v)) {
+        changed = true;
+        continue;
+      }
       // Low latency players never report completion: detect it from the clock.
       if (v.isLowLatency && !v.settings.looped) {
         final d = v.duration;
@@ -548,6 +576,70 @@ class SampleEngine extends ChangeNotifier {
       }
     }
     if (changed) notifyListeners();
+  }
+
+  /// Trimmed sound reached its end point: loop back to the start point, or stop.
+  /// Returns true when it did something.
+  bool _checkTrimEnd(PadVoice v) {
+    if (!v.settings.isTrimmed || !v.isActive) return false;
+    final d = v.duration;
+    if (d == null || d <= Duration.zero || v.settings.endMs <= 0) return false;
+    if (v._offset + v._clock.elapsed < d) return false;
+    if (v.settings.looped) {
+      v._ignorePositionUntil = DateTime.now().add(const Duration(milliseconds: 300));
+      v.player?.seek(v.startAt);
+      v._clockRestart();
+    } else {
+      _onComplete(v);
+      v.player?.stop();
+    }
+    return true;
+  }
+
+  //----------------------------------------------------------------------------
+  // "Lower the music" (manual ducking)
+
+  /// True while the music is lowered.
+  bool get ducked => _ducked;
+  bool _ducked = false;
+
+  /// Volume kept while lowered (0..1).
+  double duckLevel = 0.3;
+
+  static const int duckRampMs = 300;
+
+  /// Lowers (or brings back) the sounds playing now. Sounds started while
+  /// lowered play at their normal volume (a jingle over an announcement).
+  void setDucked(bool on) {
+    if (on == _ducked) return;
+    _ducked = on;
+    for (final v in _voices) {
+      if (v == null) continue;
+      if (on && v.state == VoiceState.idle) continue;
+      _rampDuck(v, on ? duckLevel : 1.0);
+    }
+    notifyListeners();
+  }
+
+  void _rampDuck(PadVoice v, double target) {
+    v._duckTimer?.cancel();
+    final double from = v.duckGain;
+    if ((from - target).abs() < 0.001) return;
+    const int stepMs = 30;
+    const int steps = duckRampMs ~/ stepMs;
+    int step = 0;
+    v._duckTimer = Timer.periodic(const Duration(milliseconds: stepMs), (t) {
+      final double k = (++step / steps).clamp(0.0, 1.0);
+      v.duckGain = from + (target - from) * k;
+      // A fading pad follows its own fade (which starts from liveVolume).
+      if (v.state == VoiceState.playing || v.state == VoiceState.paused) {
+        v.player?.setVolume(v.liveVolume);
+      }
+      if (k >= 1.0) {
+        t.cancel();
+        v._duckTimer = null;
+      }
+    });
   }
 
   //----------------------------------------------------------------------------
@@ -570,11 +662,12 @@ class SampleEngine extends ChangeNotifier {
     _remember(v);
     await _stopGroupMates(v);
     final p = v.player!;
-    await p.setVolume(v.settings.volume);
+    v._resetDuck();
+    await p.setVolume(v.liveVolume);
     if (v.isLowLatency) {
       await p.stop();
     } else {
-      await p.seek(Duration.zero);
+      await p.seek(v.startAt);
     }
     v._ignorePositionUntil = DateTime.now().add(const Duration(milliseconds: 300));
     await p.resume();
@@ -591,7 +684,7 @@ class SampleEngine extends ChangeNotifier {
       await p.stop();
       await p.resume();
     } else {
-      await p.seek(Duration.zero);
+      await p.seek(v.startAt);
       if (p.state != PlayerState.playing) await p.resume();
     }
     v.state = VoiceState.playing;
@@ -620,7 +713,8 @@ class SampleEngine extends ChangeNotifier {
     if (v.state == VoiceState.fading) return;
 
     v.state = VoiceState.fading;
-    final double startVol = v.settings.volume;
+    v._duckTimer?.cancel();
+    final double startVol = v.liveVolume;
     final int startedAt = DateTime.now().millisecondsSinceEpoch;
     final int total = fadeMs;
 
@@ -641,6 +735,7 @@ class SampleEngine extends ChangeNotifier {
 
   Future<void> _hardStop(PadVoice v) async {
     v._cancelFade();
+    v._resetDuck();
     v.state = VoiceState.idle;
     v._clockReset();
     final p = v.player;
@@ -655,7 +750,18 @@ class SampleEngine extends ChangeNotifier {
 
   void _onComplete(PadVoice v) {
     if (v.state == VoiceState.idle) return;
+    // Trimmed + looped without an end point: back to the start point.
+    if (v.settings.isTrimmed && v.settings.looped && v.state == VoiceState.playing) {
+      final p = v.player;
+      if (p != null) {
+        v._ignorePositionUntil = DateTime.now().add(const Duration(milliseconds: 300));
+        p.seek(v.startAt).then((_) => p.resume());
+        v._clockRestart();
+        return;
+      }
+    }
     v._cancelFade();
+    v._resetDuck();
     v.state = VoiceState.idle;
     v._clockReset();
     v.player?.setVolume(v.settings.volume);

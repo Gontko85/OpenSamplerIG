@@ -116,6 +116,59 @@ class Strings {
     'No track.\nAdd some with the button below.',
   );
 
+  // Compact display
+  String get compactMode => _t('Affichage compact (petit écran)', 'Compact display (small screens)');
+  String get compactAuto => _t('Automatique (téléphones)', 'Automatic (phones)');
+  String get compactOn => _t('Toujours', 'Always');
+  String get compactOff => _t('Jamais', 'Never');
+  String get compactHint => _t(
+    'Masque le nom du projet, les barres « En cours » et « Récents », et resserre les onglets et le conducteur pour laisser toute la place aux touches.',
+    'Hides the project name and the "Now playing" and "Recent" bars, and tightens the tabs and the rundown so the pads get all the room.',
+  );
+  String get compactMenu => _t('Affichage compact', 'Compact display');
+
+  // Lower the music (announcements)
+  String get duckTooltip => _t(
+    'Baisser la musique (annonce) — appui : baisse / remonte, maintien : baisse tant que le doigt reste',
+    'Lower the music (announcement) — tap: lower / restore, hold: lowered while held',
+  );
+  String get showDuck =>
+      _t('Bouton « Baisser la musique » (annonces)', '"Lower the music" button (announcements)');
+  String get duckLevel => _t('Volume quand la musique est baissée', 'Volume when the music is lowered');
+
+  // Start / end point
+  String get trimWhole => _t('Son entier', 'Whole sound');
+  String trimSummary(String from, String to) => _t('De $from à $to', 'From $from to $to');
+  String get trimEdit => _t('Début / fin…', 'Start / end…');
+  String get trimTitle => _t('Début et fin du son', 'Start and end of the sound');
+  String get trimStart => _t('Début', 'Start');
+  String get trimEnd => _t('Fin', 'End');
+  String trimPlayed(String d) => _t('Durée jouée : $d', 'Played length: $d');
+  String get trimListenStart => _t('Écouter depuis le début', 'Listen from the start');
+  String get trimListenEnd => _t('Écouter la fin', 'Listen to the end');
+  String get trimStop => _t('Arrêter l\'écoute', 'Stop listening');
+  String get trimSetHere => _t('Ici', 'Here');
+  String get trimSetHereTip => _t('Placer à l\'endroit écouté', 'Set at the listening position');
+  String get trimReset => _t('Revenir au son entier', 'Back to the whole sound');
+  String get trimUnknown =>
+      _t('Durée du son inconnue : impossible de le découper.', 'Unknown sound length: it cannot be trimmed.');
+  String get trimHint => _t(
+    'Faites glisser les deux poignées, ou écoutez et touchez « Ici » au bon moment. Le fichier n\'est pas modifié.',
+    'Drag both handles, or listen and tap "Here" at the right moment. The file itself is not changed.',
+  );
+
+  // Copy a pad to another project
+  String get copyToProject => _t('Copier vers un autre projet', 'Copy to another project');
+  String get copyToProjectPick => _t('Copier dans quel projet ?', 'Copy into which project?');
+  String get copyToProjectNone => _t(
+    'Aucun autre projet enregistré. Enregistrez d\'abord un autre projet (Menu > Enregistrer le projet).',
+    'No other saved project. Save another project first (Menu > Save project).',
+  );
+  String copyToProjectPad(String project) =>
+      _t('Touche de destination dans « $project »', 'Target pad in "$project"');
+  String copiedToProject(String project) => _t('Touche copiée dans « $project »', 'Pad copied to "$project"');
+  String get copyToProjectError => _t('Ce projet ne peut pas être lu.', 'This project cannot be read.');
+
   // Match rundowns ("conducteurs")
   String get rundowns => _t('Conducteurs de match', 'Match rundowns');
   String get rundownShort => _t('Conducteur', 'Rundown');
@@ -407,6 +460,25 @@ class Strings {
             '',
             'Dans les réglages d\'une touche, « Ajouter des morceaux… » en fait une playlist : chaque appui joue le morceau suivant, dans l\'ordre ou au hasard (sans répétition avant que tous aient été joués). Le morceau suivant est préparé à l\'avance pour partir sans délai. La touche affiche le numéro et le nom du morceau.',
           ),
+          ('Affichage compact et « Baisser la musique »', null),
+          (
+            '',
+            'Sur un téléphone, l\'affichage compact (Réglages, ou Menu > Affichage compact) masque le nom du projet et les barres du bas, et resserre onglets et conducteur : les touches gardent toute la place.',
+          ),
+          (
+            '',
+            'Le bouton 📣 en haut baisse les sons en cours pendant une annonce au micro : un appui baisse, un autre appui remonte ; en le maintenant, la musique reste baissée tant que le doigt est posé. Le niveau se règle dans les Réglages. Un son lancé pendant l\'annonce part à son volume normal.',
+          ),
+          ('Début et fin d\'un son', null),
+          (
+            '',
+            'Réglages d\'une touche > « Début / fin… » : choisissez où le son commence et où il s\'arrête, sans éditeur audio. Écoutez et touchez « Ici » au bon moment, ou faites glisser les poignées. Le fichier n\'est pas modifié ; en boucle, le son repart du point de départ.',
+          ),
+          ('Copier une touche vers un autre projet', null),
+          (
+            '',
+            'Réglages d\'une touche > icône 📁 en haut : choisissez un autre projet enregistré, puis la touche de destination (sur n\'importe quelle page). Le son n\'est pas dupliqué sur le téléphone.',
+          ),
           ('Conducteur de match', null),
           (
             '',
@@ -507,6 +579,25 @@ class Strings {
           (
             '',
             'In a pad\'s settings, "Add tracks…" turns it into a playlist: each press plays the next track, in order or random (no repeat before all were played). The next track is prepared in advance so it starts at once. The pad shows the track number and name.',
+          ),
+          ('Compact display and "Lower the music"', null),
+          (
+            '',
+            'On a phone, the compact display (Settings, or Menu > Compact display) hides the project name and the bottom bars, and tightens tabs and rundown: the pads keep all the room.',
+          ),
+          (
+            '',
+            'The 📣 button at the top lowers the sounds playing during a microphone announcement: tap to lower, tap again to restore; hold it to keep the music lowered while your finger stays. Set the level in Settings. A sound started during the announcement plays at its normal volume.',
+          ),
+          ('Start and end of a sound', null),
+          (
+            '',
+            'Pad settings > "Start / end…": choose where the sound starts and stops, without an audio editor. Listen and tap "Here" at the right moment, or drag the handles. The file is not changed; when looped, the sound goes back to the start point.',
+          ),
+          ('Copy a pad to another project', null),
+          (
+            '',
+            'Pad settings > 📁 icon at the top: pick another saved project, then the target pad (on any page). The sound file is not duplicated on the device.',
           ),
           ('Match rundown', null),
           (

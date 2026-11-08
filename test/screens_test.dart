@@ -11,6 +11,7 @@ import 'package:opensampler/pad_tile.dart';
 import 'package:opensampler/rundown_screen.dart';
 import 'package:opensampler/sample_engine.dart';
 import 'package:opensampler/settings.dart';
+import 'package:opensampler/trim_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _loadFonts() async {
@@ -45,11 +46,14 @@ Settings _demo() {
 
 void main() {
   _rundownEditorTest();
+  _v26Tests();
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({'language': 'fr'});
     preferences = await SharedPreferences.getInstance();
     documentDirectory = Directory.systemTemp.createTempSync('os_scr');
     loadLanguage();
+    // The test screens are phone-sized: keep the full display unless a test asks.
+    GlobalPrefs.compactMode = CompactMode.off;
   });
 
   for (final lang in ['fr', 'en']) {
@@ -328,8 +332,124 @@ void _rundownEditorTest() {
   });
 }
 
+void _v26Tests() {
+  testWidgets('compact display on a phone: no title, no bottom bars, one-row rundown; lower the music', (
+    tester,
+  ) async {
+    setLanguage('fr');
+    await tester.runAsync(_loadFonts);
+    tester.view.physicalSize = const Size(1080, 2000);
+    tester.view.devicePixelRatio = 2.75;
+    GlobalPrefs.compactMode = CompactMode.auto; // phone width → compact
+    preferences.setBool(GlobalPrefs.showRundownKey, true);
+    final engine = _RecordingEngine();
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+        home: PadScreen(_demo(), engine: engine),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    final state = tester.state(find.byType(PadScreen));
+    final copy = (state as dynamic).debugSettings as Settings;
+    for (int i = 0; i < 6; i++) {
+      copy.padSettings[i].sample = '/sons/$i.mp3';
+    }
+    final pads = copy.padSettings;
+    copy.rundowns = [
+      Rundown(
+        'Match du samedi',
+        steps: [
+          RundownStep(pads[4].id, caption: 'Hymne'),
+          RundownStep(pads[0].id, note: 'au coup de sifflet', caption: 'Entrée joueurs'),
+          RundownStep(pads[1].id),
+        ],
+        position: 1,
+      ),
+    ];
+    final voices = List<PadVoice?>.filled(36, null);
+    voices[3] = PadVoice(3, pads[3])
+      ..debugSet(VoiceState.playing, const Duration(seconds: 20), const Duration(seconds: 90));
+    engine.debugSetVoices(voices, recentPads: [pads[3]]);
+    (state as dynamic).setState(() {});
+    await tester.pump();
+
+    expect(find.text('Match NM1'), findsNothing, reason: 'project name hidden');
+    expect(find.text('2/3'), findsOneWidget);
+    expect(find.byIcon(Icons.history), findsNothing, reason: 'no recent row');
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/compact_fr.png'));
+
+    // "Lower the music": tap = lowered, tap again = back.
+    await tester.tap(find.byIcon(Icons.campaign_outlined));
+    await tester.pump();
+    expect(engine.ducks, [true]);
+    expect(find.byIcon(Icons.volume_down), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.volume_down));
+    await tester.pump();
+    expect(engine.ducks, [true, false]);
+    // Held: lowered only while the finger stays.
+    final g = await tester.startGesture(tester.getCenter(find.byIcon(Icons.campaign_outlined)));
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(engine.ducks.last, true);
+    await g.up();
+    await tester.pump();
+    expect(engine.ducks.last, false);
+
+    GlobalPrefs.compactMode = CompactMode.off;
+    preferences.setBool(GlobalPrefs.showRundownKey, false);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('start / end screen', (tester) async {
+    setLanguage('fr');
+    await tester.runAsync(_loadFonts);
+    tester.view.physicalSize = const Size(1080, 2000);
+    tester.view.devicePixelRatio = 2.75;
+    final pad = PadSettings(0)
+      ..caption = 'Seven Nation Army'
+      ..sample = '/sons/sna.mp3'
+      ..durationMs = 231000
+      ..startMs = 12500
+      ..endMs = 74000;
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+        home: TrimScreen(pad, withPlayer: false),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('0:12,5'), findsOneWidget);
+    expect(find.text('1:14,0'), findsOneWidget);
+    expect(find.text('Durée jouée : 1:01,5'), findsOneWidget);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/trim_fr.png'));
+
+    // Nudge the start by +1 s, then back to the whole sound.
+    await tester.tap(find.text('+1 s').first);
+    await tester.pump();
+    expect(pad.startMs, 13500);
+    await tester.tap(find.byIcon(Icons.settings_backup_restore));
+    await tester.pump();
+    expect((pad.startMs, pad.endMs), (0, 0));
+  });
+}
+
 class _RecordingEngine extends SampleEngine {
   final List<int> pressed = [];
+  final List<bool> ducks = [];
+
+  bool _d = false;
+
+  @override
+  bool get ducked => _d;
+
+  @override
+  void setDucked(bool on) {
+    ducks.add(on);
+    _d = on;
+    notifyListeners();
+  }
 
   @override
   Future<void> press(int i) async => pressed.add(i);

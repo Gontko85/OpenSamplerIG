@@ -1,0 +1,24 @@
+def mirror = 'https://maven-central.storage-download.googleapis.com/maven2/'
+def addMirror = { RepositoryHandler repos, boolean keepPortal ->
+  boolean wasEmpty = repos.isEmpty()
+  def r = repos.maven { url mirror; name 'gcsMavenMirror' }
+  repos.remove(r)
+  repos.add(0, r)
+  // An empty list meant "Gradle Plugin Portal" implicitly: keep it.
+  if (wasEmpty && keepPortal) repos.gradlePluginPortal()
+}
+// Builds whose dependency repositories are declared in settings (projects must not add any).
+def settingsRepoBuilds = Collections.newSetFromMap(new IdentityHashMap())
+beforeSettings { s -> addMirror(s.buildscript.repositories, false) }
+settingsEvaluated { s ->
+  addMirror(s.pluginManagement.repositories, true)
+  def drm = s.dependencyResolutionManagement.repositories
+  if (!drm.isEmpty()) {
+    addMirror(drm, false)
+    settingsRepoBuilds.add(s.gradle)
+  }
+}
+allprojects { p ->
+  addMirror(p.buildscript.repositories, false)
+  if (!settingsRepoBuilds.contains(p.gradle)) addMirror(p.repositories, false)
+}

@@ -36,7 +36,8 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   `sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"`.
 - Maven Central renvoie souvent 429 via le proxy : ajouter un init script Gradle
   (~/.gradle/init.d) qui place `https://maven-central.storage-download.googleapis.com/maven2/`
-  en premier dépôt (pluginManagement + projets racine uniquement).
+  en premier dépôt : script prêt à copier dans `tool/gradle-mirror.init.gradle` (gère les dépôts
+  déclarés dans settings, le buildscript de settings et le Plugin Portal implicite).
 - `flutter build apk --release --split-per-abi` (l'APK universel ~50 Mo dépasse la limite d'envoi de 30 Mo).
 - Signature : `android/key.properties` + keystore `opensampler-ig-release.jks` (alias `opensampler`),
   JAMAIS versionnés. Ivan les détient ; les lui demander avant toute release, sinon

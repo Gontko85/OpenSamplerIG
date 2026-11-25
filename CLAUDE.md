@@ -28,6 +28,7 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   ids de pads par projet dans les préférences (`played:<fichier>`, survit à la fermeture, pas dans le JSON
   ni l'export) ; bouton ↻ + compteur dans la barre du haut pour tout effacer (SnackBar « Annuler ») ;
   interrupteur GlobalPrefs.showPlayed.
+- v2.7.1 (livrée) : SnackBar avec action → `persist: false` obligatoire (Flutter les garde sinon à l'écran).
 - En réserve : fondu d'entrée par pad, clignotement en fin de son, vibration, verrouillage de l'orientation,
   baisse auto (ducking automatique) pour pads prioritaires.
 - Écarté par Ivan : code PIN du mode scène (un seul utilisateur), journal de diffusion SACEM (plus obligatoire),

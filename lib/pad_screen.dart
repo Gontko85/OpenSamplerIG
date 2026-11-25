@@ -205,6 +205,8 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       ..showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 5),
+          // With an action, Flutter keeps a snack bar until closed: disappear after 5 s instead.
+          persist: false,
           content: Text(S.playedCleared(n)),
           action: SnackBarAction(
             label: S.undo,
@@ -233,6 +235,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       ..showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 8),
+          persist: false,
           content: Text('${_settings.padSettings[idx].caption} : $msg'),
           action: _stageLock ? null : SnackBarAction(label: S.padProblemFix, onPressed: () => _editPad(idx)),
         ),

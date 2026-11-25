@@ -4,6 +4,11 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.7.1
+
+- Le bandeau « X voyants effacés / Annuler » disparaît seul au bout de 5 secondes (il restait affiché).
+  Idem pour le bandeau d'une touche en erreur (« Réparer »), qui disparaît après 8 secondes.
+
 ## Nouveautés de la v2.7.0
 
 - **Voyant « déjà jouée »** : chaque touche lancée garde un petit voyant vert fixe dans son coin en haut à

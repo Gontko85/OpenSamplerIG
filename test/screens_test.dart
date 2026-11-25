@@ -492,7 +492,13 @@ void _playedTests() {
     await tester.pump();
     expect(lights, findsNWidgets(2));
     await tester.tap(clear);
-    await tester.pump(const Duration(seconds: 6));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('2 voyants effacés'), findsOneWidget);
+    // The bar goes away by itself after 5 seconds (it has an "Undo" button).
+    for (int k = 0; k < 70; k++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('2 voyants effacés'), findsNothing);
     expect(lights, findsNothing);
     expect(GlobalPrefs.playedPads('Lumieres.json'), isEmpty);
 

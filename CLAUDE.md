@@ -24,6 +24,10 @@ Méthode : plans phase par phase. Interface FR/EN (lib/l10n.dart).
   barres du bas, onglets/conducteur resserrés), « Baisser la musique » (SampleEngine.setDucked, duckGain par
   voix, rampe 300 ms, appui = bascule / maintien = momentané), début/fin d'un son (PadSettings.startMs/endMs,
   force le lecteur mediaPlayer, boucle manuelle vers startMs, TrimScreen), copier une touche vers un autre projet.
+- v2.7.0 (livrée) : voyant vert « déjà jouée » (PlayedLight, coin haut droit, fixe) posé dans `_press`,
+  ids de pads par projet dans les préférences (`played:<fichier>`, survit à la fermeture, pas dans le JSON
+  ni l'export) ; bouton ↻ + compteur dans la barre du haut pour tout effacer (SnackBar « Annuler ») ;
+  interrupteur GlobalPrefs.showPlayed.
 - En réserve : fondu d'entrée par pad, clignotement en fin de son, vibration, verrouillage de l'orientation,
   baisse auto (ducking automatique) pour pads prioritaires.
 - Écarté par Ivan : code PIN du mode scène (un seul utilisateur), journal de diffusion SACEM (plus obligatoire),

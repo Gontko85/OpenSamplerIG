@@ -514,6 +514,18 @@ class GlobalPrefs {
   static const String compactModeKey = "compactMode";
   static const String duckLevelKey = "duckLevel";
   static const String showDuckKey = "showDuck";
+  static const String showPlayedKey = "showPlayed";
+
+  /// Green light on the pads already played (until cleared).
+  static bool get showPlayed => preferences.getBool(showPlayedKey) ?? true;
+  static set showPlayed(bool v) => preferences.setBool(showPlayedKey, v);
+
+  /// Pads already played in a project (their ids), kept when the app closes.
+  static Set<String> playedPads(String project) =>
+      (preferences.getStringList('played:$project') ?? const <String>[]).toSet();
+  static void setPlayedPads(String project, Set<String> ids) => ids.isEmpty
+      ? preferences.remove('played:$project')
+      : preferences.setStringList('played:$project', ids.toList());
 
   /// Compact display: auto (phones), on, off.
   static CompactMode get compactMode =>

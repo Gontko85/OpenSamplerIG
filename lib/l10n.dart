@@ -116,6 +116,14 @@ class Strings {
     'No track.\nAdd some with the button below.',
   );
 
+  // Pads already played
+  String get showPlayed =>
+      _t('Voyant vert sur les touches déjà jouées', 'Green light on the pads already played');
+  String get clearPlayed => _t('Effacer les voyants « déjà jouée »', 'Clear the "already played" lights');
+  String playedCleared(int n) =>
+      _t(n > 1 ? '$n voyants effacés' : '1 voyant effacé', n > 1 ? '$n lights cleared' : '1 light cleared');
+  String get undo => _t('Annuler', 'Undo');
+
   // Compact display
   String get compactMode => _t('Affichage compact (petit écran)', 'Compact display (small screens)');
   String get compactAuto => _t('Automatique (téléphones)', 'Automatic (phones)');
@@ -460,6 +468,11 @@ class Strings {
             '',
             'Dans les réglages d\'une touche, « Ajouter des morceaux… » en fait une playlist : chaque appui joue le morceau suivant, dans l\'ordre ou au hasard (sans répétition avant que tous aient été joués). Le morceau suivant est préparé à l\'avance pour partir sans délai. La touche affiche le numéro et le nom du morceau.',
           ),
+          ('Touches déjà jouées', null),
+          (
+            '',
+            'Chaque touche lancée garde un petit voyant vert dans son coin en haut à droite : on voit d\'un coup d\'œil ce qui a déjà été joué. Le voyant ne bloque rien, la touche se rejoue normalement. Le bouton en haut (avec le nombre de touches jouées) efface tous les voyants du projet, sur toutes les pages ; « Annuler » les rétablit. Les voyants restent même si l\'appli est fermée. Désactivable dans les Réglages.',
+          ),
           ('Affichage compact et « Baisser la musique »', null),
           (
             '',
@@ -579,6 +592,11 @@ class Strings {
           (
             '',
             'In a pad\'s settings, "Add tracks…" turns it into a playlist: each press plays the next track, in order or random (no repeat before all were played). The next track is prepared in advance so it starts at once. The pad shows the track number and name.',
+          ),
+          ('Pads already played', null),
+          (
+            '',
+            'Every pad you start keeps a small green light in its top right corner: you see at a glance what was already played. The light blocks nothing, the pad plays again as usual. The button at the top (with the number of pads played) clears all the lights of the project, on every page; "Undo" brings them back. The lights stay even when the app is closed. Can be turned off in Settings.',
           ),
           ('Compact display and "Lower the music"', null),
           (

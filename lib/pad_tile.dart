@@ -24,6 +24,12 @@ class PadTile extends StatelessWidget {
   /// Search highlight: 0 = none, 1 = another match, 2 = the current match.
   final int highlight;
 
+  /// Already played (green light in the top right corner, until cleared).
+  final bool played;
+
+  /// Colour of the "already played" light.
+  static const Color playedColor = Color(0xFF00E676);
+
   /// Colour of the search frame (distinct from white = playing, amber = paused, red = error).
   static const Color searchColor = Color(0xFF2979FF);
 
@@ -37,6 +43,7 @@ class PadTile extends StatelessWidget {
     required this.onTrigger,
     required this.onEdit,
     this.highlight = 0,
+    this.played = false,
   });
 
   static String formatDuration(Duration d) {
@@ -164,6 +171,7 @@ class PadTile extends StatelessWidget {
               ],
               if (state == VoiceState.paused) Icon(Icons.pause, size: 16, color: settings.textColor),
               if (v?.missing ?? false) const Icon(Icons.error, size: 16, color: Colors.redAccent),
+              if (played) ...[const SizedBox(width: 3), const PlayedLight()],
             ],
           ),
         ),
@@ -327,6 +335,31 @@ class AutoFitText extends StatelessWidget {
           style: style.copyWith(fontSize: size, height: 1.1),
         );
       },
+    );
+  }
+}
+
+//==============================================================================
+
+/// The "already played" light: a green dot with a white ring and a dark edge,
+/// readable on any pad colour. Steady (no blinking, it would draw the eye).
+class PlayedLight extends StatelessWidget {
+  final double size;
+
+  const PlayedLight({super.key, this.size = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('playedLight'),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: PadTile.playedColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 0, spreadRadius: 1)],
+      ),
     );
   }
 }

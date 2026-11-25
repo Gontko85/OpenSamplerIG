@@ -4,6 +4,13 @@ Sampler / sound board pour Android — version modernisée et enrichie de
 [Open Sampler](https://github.com/trvekvltgames/opensampler) (Cherry Tree Studio, 2021),
 par Ivan Gontcharenko — IG Littoral Labs.
 
+## Nouveautés de la v2.7.0
+
+- **Voyant « déjà jouée »** : chaque touche lancée garde un petit voyant vert fixe dans son coin en haut à
+  droite (repère pour l'opérateur, la touche se rejoue normalement). Le bouton ↻ en haut, avec le nombre de
+  touches jouées, efface tous les voyants du projet (toutes pages) ; « Annuler » les rétablit. Les voyants
+  restent si l'appli se ferme ; désactivables dans les Réglages.
+
 ## Nouveautés de la v2.6.0
 
 - **Affichage compact** (automatique sur téléphone, ou Réglages / Menu > Affichage compact) : sans nom de

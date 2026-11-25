@@ -159,6 +159,63 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
       return;
     }
     _engine.press(idx);
+    _markPlayed(idx);
+  }
+
+  //----------------------------------------------------------------------------
+  // "Already played" lights (per project, kept when the app closes)
+
+  String? _playedProject;
+  Set<String> _played = {};
+
+  String get _projectKey => p.basename(_settings.file.path);
+
+  /// Lights of the project on screen (reloaded when another project is opened).
+  Set<String> get _playedIds {
+    if (_playedProject != _projectKey) {
+      _playedProject = _projectKey;
+      _played = GlobalPrefs.playedPads(_projectKey);
+    }
+    return _played;
+  }
+
+  /// Lights of pads that still exist and have a sound.
+  int get _playedCount {
+    final ids = _playedIds;
+    return _settings.padSettings.where((pad) => pad.hasSample && ids.contains(pad.id)).length;
+  }
+
+  void _markPlayed(int idx) {
+    if (!GlobalPrefs.showPlayed) return;
+    final pad = _settings.padSettings[idx];
+    if (!pad.hasSample || _playedIds.contains(pad.id)) return;
+    setState(() => _played.add(pad.id));
+    GlobalPrefs.setPlayedPads(_projectKey, _played);
+  }
+
+  void _clearPlayed() {
+    final Set<String> before = Set.of(_playedIds);
+    final int n = _playedCount;
+    if (before.isEmpty) return;
+    setState(() => _played = {});
+    GlobalPrefs.setPlayedPads(_projectKey, _played);
+    final String key = _projectKey;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 5),
+          content: Text(S.playedCleared(n)),
+          action: SnackBarAction(
+            label: S.undo,
+            onPressed: () {
+              if (!mounted || key != _projectKey) return;
+              setState(() => _played = {..._played, ...before});
+              GlobalPrefs.setPlayedPads(key, _played);
+            },
+          ),
+        ),
+      );
   }
 
   /// Plain-language reason for a pad with a red badge.
@@ -1348,6 +1405,9 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
     final double? fontSize = prefFont != "Default" ? double.tryParse(prefFont) : null;
     final bool showRemaining = GlobalPrefs.showRemaining;
     final bool compact = _isCompact(context);
+    final bool showPlayed = GlobalPrefs.showPlayed;
+    final Set<String> playedIds = _playedIds;
+    final int playedCount = showPlayed ? _playedCount : 0;
     final double spacing = compact ? 2 : 4;
     final VisualDensity density = compact ? VisualDensity.compact : VisualDensity.standard;
     _refreshMatches();
@@ -1378,6 +1438,20 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
             color: _showRundown ? Colors.lightGreenAccent : null,
             onPressed: () => setState(() => GlobalPrefs.showRundown = _showRundown = !_showRundown),
           ),
+          if (showPlayed)
+            IconButton(
+              key: const ValueKey('clearPlayed'),
+              visualDensity: density,
+              tooltip: S.clearPlayed,
+              onPressed: playedCount > 0 ? _clearPlayed : null,
+              icon: Badge(
+                isLabelVisible: playedCount > 0,
+                backgroundColor: PadTile.playedColor,
+                textColor: Colors.black,
+                label: Text('$playedCount'),
+                child: const Icon(Icons.restart_alt),
+              ),
+            ),
           if (GlobalPrefs.showDuck)
             _DuckButton(ducked: _engine.ducked, compact: compact, onChanged: (on) => _engine.setDucked(on)),
           _StopButton(
@@ -1448,6 +1522,7 @@ class _PadScreenState extends State<PadScreen> with SingleTickerProviderStateMix
                                 onTrigger: () => _press(i),
                                 onEdit: () => _editPad(i),
                                 highlight: _highlightOf(i),
+                                played: showPlayed && playedIds.contains(_settings.padSettings[i].id),
                               ),
                             ),
                           );

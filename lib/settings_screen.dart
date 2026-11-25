@@ -127,6 +127,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
+            title: Text(S.showPlayed),
+            value: GlobalPrefs.showPlayed,
+            onChanged: (v) => setState(() => GlobalPrefs.showPlayed = v),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
             title: Text(S.showDuck),
             value: GlobalPrefs.showDuck,
             onChanged: (v) => setState(() => GlobalPrefs.showDuck = v),

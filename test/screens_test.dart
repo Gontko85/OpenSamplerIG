@@ -47,6 +47,7 @@ Settings _demo() {
 void main() {
   _rundownEditorTest();
   _v26Tests();
+  _playedTests();
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({'language': 'fr'});
     preferences = await SharedPreferences.getInstance();
@@ -432,6 +433,80 @@ void _v26Tests() {
     await tester.tap(find.byIcon(Icons.settings_backup_restore));
     await tester.pump();
     expect((pad.startMs, pad.endMs), (0, 0));
+  });
+}
+
+void _playedTests() {
+  testWidgets('green light on pads already played; clear all, undo, kept after closing', (tester) async {
+    setLanguage('fr');
+    await tester.runAsync(_loadFonts);
+    tester.view.physicalSize = const Size(1080, 2000);
+    tester.view.devicePixelRatio = 2.75;
+    GlobalPrefs.compactMode = CompactMode.on;
+    final project = _demo()..file = File('${documentDirectory.path}/Lumieres.json');
+    for (int i = 0; i < 6; i++) {
+      project.padSettings[i].sample = '/sons/$i.mp3';
+    }
+    Future<_RecordingEngine> open() async {
+      final engine = _RecordingEngine();
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(fontFamily: 'Roboto', colorSchemeSeed: Colors.blueGrey, useMaterial3: true),
+          home: PadScreen(project, engine: engine),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      return engine;
+    }
+
+    final engine = await open();
+    final lights = find.byType(PlayedLight);
+    expect(lights, findsNothing);
+    final clear = find.byKey(const ValueKey('clearPlayed'));
+    expect(tester.widget<IconButton>(clear).onPressed, isNull, reason: 'nothing to clear yet');
+
+    Finder pad(int i) => find.byType(PadTile).at(i);
+    await tester.tap(pad(2));
+    await tester.tap(pad(4));
+    await tester.tap(pad(2)); // played again: still one light, nothing blocked
+    await tester.tap(pad(6)); // blank pad: no light
+    await tester.pump();
+    expect(engine.pressed, [2, 4, 2, 6]);
+    expect(lights, findsNWidgets(2));
+    expect(find.descendant(of: clear, matching: find.text('2')), findsOneWidget);
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/played_fr.png'));
+
+    // Closing and reopening the project keeps the lights.
+    await tester.pumpWidget(const SizedBox());
+    await open();
+    expect(lights, findsNWidgets(2));
+
+    // Clear all, then undo, then clear again.
+    await tester.tap(clear);
+    await tester.pump();
+    expect(lights, findsNothing);
+    await tester.pump(const Duration(milliseconds: 500)); // snack bar slides in
+    expect(find.text('2 voyants effacés'), findsOneWidget);
+    await tester.tap(find.text('Annuler'));
+    await tester.pump();
+    expect(lights, findsNWidgets(2));
+    await tester.tap(clear);
+    await tester.pump(const Duration(seconds: 6));
+    expect(lights, findsNothing);
+    expect(GlobalPrefs.playedPads('Lumieres.json'), isEmpty);
+
+    // Turned off in the settings: no light, no button.
+    GlobalPrefs.showPlayed = false;
+    await tester.pumpWidget(const SizedBox());
+    await open();
+    await tester.tap(find.byType(PadTile).at(4));
+    await tester.pump();
+    expect(lights, findsNothing);
+    expect(clear, findsNothing);
+    GlobalPrefs.showPlayed = true;
+    GlobalPrefs.compactMode = CompactMode.off;
+    await tester.pump(const Duration(seconds: 1));
   });
 }
 
